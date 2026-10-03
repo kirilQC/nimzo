@@ -68,8 +68,37 @@ export function expressionForMistake(args: {
   return pick<Expression>(["skeptical", "puzzled", "pondering"], ply);
 }
 
+/** Expression for any move as you step through a game (yours or your opponent's). */
+export function expressionForMove(args: {
+  label: string | null;
+  mine: boolean;
+  ply: number;
+  clockMs: number | null;
+  missedMate?: boolean;
+  winBefore?: number | null;
+}): Expression {
+  const { label, mine, ply } = args;
+  if (mine && (label === "blunder" || label === "miss" || label === "mistake" || label === "inaccuracy"))
+    return expressionForMistake({ severity: label, ply, clockMs: args.clockMs, missedMate: args.missedMate, winBefore: args.winBefore });
+  if (!mine) {
+    // Their mistakes are your chances; their good moves are warnings.
+    if (label === "blunder" || label === "miss") return pick<Expression>(["eureka", "pointing"], ply);
+    if (label === "mistake") return "pleased";
+    if (label === "brilliant" || label === "great") return "concentrating";
+    return pick<Expression>(["neutral", "pondering", "explaining"], ply);
+  }
+  if (label === "brilliant") return "celebrating";
+  if (label === "great") return pick<Expression>(["delighted", "eureka"], ply);
+  if (label === "best") return pick<Expression>(["thumbs_up", "pleased"], ply);
+  if (label === "excellent") return pick<Expression>(["pleased", "kind_smile"], ply);
+  if (label === "book") return pick<Expression>(["neutral", "warm_smile"], ply);
+  return pick<Expression>(["explaining", "neutral"], ply);
+}
+
 /** Expression for the game summary, from the result and accuracy. */
-export function expressionForGame(result: "win" | "loss" | "draw" | null, accuracy: number | null): Expression {
+export function expressionForGame(result: "win" | "loss" | "draw" | null, accuracy: number | null, verdict?: string | null): Expression {
+  if (verdict === "excellent") return result === "win" ? "celebrating" : "delighted";
+  if (verdict === "rough") return result === "win" ? "laughing" : "sympathetic";
   if (result === "win") return (accuracy ?? 0) >= 80 ? "celebrating" : "thumbs_up";
   if (result === "draw") return "shrug";
   if (result === "loss") return (accuracy ?? 100) < 50 ? "sympathetic" : "earnest";

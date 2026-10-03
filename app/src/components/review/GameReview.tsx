@@ -7,11 +7,11 @@ import { EvalBar } from "@/components/board/EvalBar";
 import { EvalGraph } from "@/components/board/EvalGraph";
 import { SeverityChip, type Severity } from "@/components/ui";
 import { MoveIcon } from "@/components/board/MoveIcon";
-import { LABEL_SUFFIX, MOVE_LABELS, type LabelId } from "@/lib/analysis/labels";
+import { MOVE_LABELS, type LabelId } from "@/lib/analysis/labels";
 import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { ArthurPanel } from "@/components/coach/ArthurPanel";
-import { expressionForGame, expressionForMistake } from "@/lib/coach/expressions";
+import { expressionForGame, expressionForMove } from "@/lib/coach/expressions";
 
 export type ReviewPly = {
   ply: number;
@@ -24,7 +24,19 @@ export type ReviewPly = {
   isMine: boolean;
   severity: Severity | null;
   label: LabelId | null;
+  note: string | null; // Arthur's one plain sentence about this move
+  bestUci: string | null; // engine's move in the position before this one
   whitePct: number | null;
+};
+
+/** v2 summaries have a headline, verdict and overview; older ones a key moment. */
+export type ReviewSummary = {
+  headline?: string;
+  verdict?: "excellent" | "good" | "mixed" | "rough";
+  overview?: string;
+  key_moment?: string;
+  went_well: string;
+  work_on: string;
 };
 
 export type CoachInfo = {
@@ -37,6 +49,8 @@ export type CoachInfo = {
   punishLine: string | null; // opponent's best reply after my move, numbered
   punishEval: string | null;
   missedMate: boolean;
+  winBefore: number | null; // your winning chances, %
+  winAfter: number | null;
   evalBefore: string | null;
   evalAfter: string | null;
   tags: { id: string; label: string; confidence: number | null }[];
@@ -53,7 +67,7 @@ export type ReviewData = {
   plies: ReviewPly[];
   coach: Record<number, CoachInfo>;
   analyzed: boolean;
-  summary: { key_moment: string; went_well: string; work_on: string } | null;
+  summary: ReviewSummary | null;
   result: "win" | "loss" | "draw" | null;
   accuracy: number | null;
   accuracyOpponent: number | null;
@@ -147,6 +161,11 @@ export function GameReview({ data }: { data: ReviewData }) {
                 orientation={myColor}
                 lastMove={pos ? { from: pos.from, to: pos.to } : null}
                 badge={pos?.label ? { square: pos.to, label: pos.label } : null}
+                arrows={
+                  pos && pos.severity && pos.bestUci && pos.bestUci !== `${pos.from}${pos.to}`
+                    ? [{ startSquare: pos.bestUci.slice(0, 2), endSquare: pos.bestUci.slice(2, 4), color: "rgba(76, 140, 60, 0.85)" }]
+                    : []
+                }
                 label={pos ? `Position after ${moveLabel(pos)}` : "Starting position"}
               />
             </div>
@@ -191,18 +210,24 @@ export function GameReview({ data }: { data: ReviewData }) {
           gameId={data.gameId}
           opening={
             data.summary
-              ? { text: `${data.summary.key_moment} ${data.summary.work_on}`, expression: expressionForGame(data.result, data.accuracy) }
+              ? {
+                  text: data.summary.overview
+                    ? `${data.summary.headline ? `${data.summary.headline}. ` : ""}${data.summary.overview} ${data.summary.work_on}`
+                    : `${data.summary.key_moment ?? ""} ${data.summary.work_on}`.trim(),
+                  expression: expressionForGame(data.result, data.accuracy, data.summary.verdict),
+                }
               : null
           }
           focus={
-            pos && pos.severity && selectedCoach?.explanation
+            pos && (pos.note || (pos.severity && selectedCoach?.explanation))
               ? {
-                  text: selectedCoach.explanation,
-                  expression: expressionForMistake({
-                    severity: pos.severity,
+                  text: pos.note ?? selectedCoach!.explanation!,
+                  expression: expressionForMove({
+                    label: pos.label,
+                    mine: pos.isMine,
                     ply: pos.ply,
                     clockMs: pos.clockMs,
-                    missedMate: selectedCoach.missedMate,
+                    missedMate: selectedCoach?.missedMate,
                     winBefore: moverWinBefore(plies, pos),
                   }),
                 }
@@ -357,52 +382,31 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
   return (
     <section className="card p-6" aria-labelledby="coach-h">
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 id="coach-h" className="mono text-xl font-medium">
-          {moveLabel(ply, LABEL_SUFFIX[ply.severity] ?? "")}
+        <h2 id="coach-h" className="text-xl">
+          Move {Math.ceil(ply.ply / 2)}
         </h2>
         <SeverityChip severity={ply.severity} />
-        {info?.evalBefore && info.evalAfter && (
-          <span className="mono text-sm text-muted">
-            {info.evalBefore} → {info.evalAfter}
+        {info?.winBefore !== null && info?.winBefore !== undefined && info.winAfter !== null && (
+          <span className="text-sm text-body2">
+            Your winning chances: <span className="mono text-ink">{info.winBefore}%</span> → <span className="mono text-ink">{info.winAfter}%</span>
           </span>
         )}
       </div>
-      {data.analyzed && !info?.explanation && data.status !== "reviewed" && (
+      {data.analyzed && !ply.note && !info?.explanation && data.status !== "reviewed" && (
         <p className="mt-3 text-sm text-muted">Arthur is still writing his notes on this move.</p>
       )}
-      {info?.missedMate && <p className="mt-3 text-sm font-semibold text-ink">You had a forced mate here.</p>}
-      {info?.bestMoveSan && (
-        <p className="mt-3 text-sm text-body2">
-          The engine preferred <span className="mono font-medium text-ink">{info.bestMoveSan}</span>
-          {info.bestMoveEval && <span className="mono"> ({info.bestMoveEval})</span>}
-          {info.bestMoveNote && <>: {info.bestMoveNote}</>}
+      {info?.missedMate && <p className="mt-3 text-sm font-semibold text-ink">You had a forced checkmate here.</p>}
+      {ply.bestUci && ply.bestUci !== `${ply.from}${ply.to}` && (
+        <p className="mt-3 flex items-center gap-2 text-sm text-body2">
+          <span className="inline-block h-1.5 w-6 rounded-full bg-[rgba(76,140,60,0.85)]" aria-hidden="true" />
+          The green arrow shows the move the engine wanted instead.
         </p>
       )}
-      {!info?.explanation && (info?.bestLine || info?.punishLine) && (
-        <dl className="mt-3 space-y-1.5 text-sm">
-          {info.bestLine && (
-            <div>
-              <dt className="inline text-muted">Best line: </dt>
-              <dd className="mono inline text-ink">{info.bestLine}</dd>
-            </div>
-          )}
-          {info.punishLine && (
-            <div>
-              <dt className="inline text-muted">After your move, their best reply: </dt>
-              <dd className="mono inline text-ink">
-                {info.punishLine}
-                {info.punishEval && <span className="text-muted"> ({info.punishEval})</span>}
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
       {info && info.tags.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-2" aria-label="Tags">
+        <ul className="mt-3 flex flex-wrap gap-2" aria-label="What happened">
           {info.tags.map((t) => (
-            <li key={t.id} className="chip font-normal">
+            <li key={t.id} className="chip font-normal" title={t.confidence !== null ? `Jev is ${Math.round(t.confidence * 100)}% sure` : "Confirmed by board analysis"}>
               {t.label}
-              {t.confidence !== null && <span className="mono"> · {t.confidence.toFixed(2)}</span>}
             </li>
           ))}
         </ul>
@@ -410,7 +414,7 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-line-soft pt-3 text-sm text-body2">
         {info?.maiaLine && (
           <span>
-            <span className="font-semibold text-ink">Maia check:</span> {info.maiaLine}
+            <span className="font-semibold text-ink">Players at your level:</span> {info.maiaLine}
           </span>
         )}
         <span>

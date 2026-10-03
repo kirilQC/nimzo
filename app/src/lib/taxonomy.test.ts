@@ -16,8 +16,9 @@ describe("taxonomy", () => {
   });
 
   it("has the 22 motifs from the brief, with labels", () => {
-    expect(MOTIFS).toHaveLength(22);
-    expect(motifLabel("hanging_piece_after_capture")).toBe("Hanging piece after a capture");
+    expect(MOTIFS.length).toBeGreaterThan(120);
+    expect(motifLabel("allowed_knight_fork")).toBe("Walked into a knight fork");
+    expect(motifLabel("hanging_piece_after_capture")).toBe("Hanging piece after a capture"); // legacy id
   });
 
   it("namespaces DB ids so 'opening' (type) and 'opening' (phase) don't collide", () => {

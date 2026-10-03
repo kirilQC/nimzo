@@ -12,12 +12,13 @@ export type BoardProps = {
   orientation?: "white" | "black";
   lastMove?: { from: string; to: string } | null;
   badge?: { square: string; label: LabelId } | null; // move label shown in the corner of a square
+  arrows?: { startSquare: string; endSquare: string; color: string }[];
   options?: Partial<ChessboardOptions>;
   label?: string;
 };
 
 /** Wooden board and pieces, last-move highlight, and the move's label badge. */
-export function Board({ fen, orientation = "white", lastMove, badge, options, label = "Chess board" }: BoardProps) {
+export function Board({ fen, orientation = "white", lastMove, badge, arrows, options, label = "Chess board" }: BoardProps) {
   const squareStyles: Record<string, React.CSSProperties> = {};
   if (lastMove) for (const sq of [lastMove.from, lastMove.to]) squareStyles[sq] = { backgroundColor: HIGHLIGHT };
   return (
@@ -41,6 +42,8 @@ export function Board({ fen, orientation = "white", lastMove, badge, options, la
           lightSquareNotationStyle: { color: DARK_SQ, fontWeight: 700 },
           darkSquareNotationStyle: { color: LIGHT_SQ, fontWeight: 700 },
           squareStyles,
+          arrows: arrows ?? [],
+          allowDrawingArrows: false,
           squareRenderer: badge
             ? ({ square, children }) => (
                 <div style={{ position: "relative", width: "100%", height: "100%" }}>

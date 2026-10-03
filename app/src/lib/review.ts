@@ -5,10 +5,13 @@ import { formatLine } from "@/lib/chess/lines";
 import { formatScore, gameAccuracy, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
 import { MOVE_LABELS, isLabelId, type LabelId } from "@/lib/analysis/labels";
 import { DIMENSIONS, motifLabel, tagLabel } from "@/lib/taxonomy";
+import { TAG_BY_ID } from "@/lib/tags/catalog";
+
+type TagsV2 = { version: 2; rules: string[]; merged: string[]; jev: { tags: Record<string, number> } | null };
 
 export type MistakeRecord = {
   ply: number;
-  tags: {
+  tags: TagsV2 | {
     mistake_type?: { value: string; confidence: number | null; source: string };
     root_cause?: { value: string; confidence: number | null; source: string };
     motifs?: Record<string, { value: boolean; confidence: number | null; source: string }>;
@@ -30,6 +33,16 @@ export function maiaSentence(m: NonNullable<MistakeRecord["maia"]>): string {
 
 function tagChips(t: MistakeRecord["tags"], minConfidence: number) {
   if (!t) return [];
+  if ("version" in t && t.version === 2) {
+    // Rule tags are certain; Jev tags carry its probability. Problems first, then everything else.
+    const order = (id: string) => (TAG_BY_ID.get(id)?.polarity === "bad" ? 0 : 1);
+    return [...t.merged]
+      .filter((id) => id !== "book_move")
+      .sort((a, b) => order(a) - order(b))
+      .slice(0, 8)
+      .map((id) => ({ id, label: TAG_BY_ID.get(id)?.label ?? motifLabel(id), confidence: t.rules.includes(id) ? null : (t.jev?.tags[id] ?? null) }));
+  }
+  if ("version" in t) return [];
   const chips: { id: string; label: string; confidence: number | null }[] = [];
   const motifs = Object.entries(t.motifs ?? {})
     .filter(([, v]) => v.value)
@@ -52,10 +65,18 @@ export type PositionRecord = {
   classification: string | null;
   accuracy?: number | string | null;
   best_move_san: string | null;
+  best_move_uci?: string | null;
   pv_san: string[] | null;
   multipv: { score: Score; pv_san: string[] }[] | null;
   clock_ms: number | null;
 };
+
+/** The mover's winning chances (0-100) from a stored position's White win%. */
+function winOf(p: PositionRecord | undefined, color: "w" | "b"): number | null {
+  if (!p || p.win_pct === null || p.win_pct === undefined) return null;
+  const w = Number(p.win_pct);
+  return Math.round(color === "w" ? w : 100 - w);
+}
 
 function scoreOf(p: PositionRecord | undefined): Score | null {
   if (!p) return null;
@@ -77,6 +98,7 @@ export function buildReviewData(args: {
   summary?: ReviewData["summary"];
   result?: ReviewData["result"];
   accuracy?: number | null;
+  notes?: Map<number, string>;
 }): ReviewData {
   const mistakeByPly = new Map((args.mistakes ?? []).map((m) => [m.ply, m]));
   const parsed = pgnToPositions(args.pgn);
@@ -97,6 +119,8 @@ export function buildReviewData(args: {
       isMine: p.color === mine,
       severity: isSeverity(row?.classification) ? row.classification : null,
       label: isLabelId(row?.classification) ? row.classification : null,
+      note: args.notes?.get(p.ply) ?? null,
+      bestUci: row?.best_move_uci ?? null,
       whitePct: row?.win_pct !== null && row?.win_pct !== undefined ? Number(row.win_pct) : null,
     };
   });
@@ -123,6 +147,8 @@ export function buildReviewData(args: {
         punishLine: next?.pv_san?.length ? formatLine(p.ply + 1, next.pv_san.slice(0, 6)) : null,
         punishEval: formatScore(after),
         missedMate: mateBefore !== null && mateBefore > 0 && (mateAfter === null || mateAfter <= 0),
+        winBefore: winOf(byPly.get(p.ply - 1), p.color),
+        winAfter: winOf(row, p.color),
         evalBefore: formatScore(before),
         evalAfter: formatScore(after),
         tags: tagChips(mistakeByPly.get(p.ply)?.tags ?? null, args.minConfidence ?? 0.6),

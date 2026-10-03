@@ -40,8 +40,9 @@ export function ArthurPanel({
   const said = useRef(new Set<string>());
   const threadRef = useRef<HTMLOListElement>(null);
 
-  const say = (s: ArthurSay) => {
-    if (!said.current.has(s.text)) {
+  // `log`: keep it in the conversation thread (the summary and answers). Per-move notes only show in the bubble.
+  const say = (s: ArthurSay, log = true) => {
+    if (log && !said.current.has(s.text)) {
       said.current.add(s.text);
       setLines((l) => [...l, { who: "arthur", text: s.text, expression: s.expression }]);
     }
@@ -66,9 +67,9 @@ export function ArthurPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opening?.text]);
 
-  // Stepping onto a flagged move: Arthur reacts and explains it.
+  // Stepping onto a move: Arthur reacts and says his one line about it.
   useEffect(() => {
-    if (focus) say(focus);
+    if (focus) say(focus, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.text]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -116,7 +117,7 @@ export function ArthurPanel({
   }
 
   const arthurLines = lines.filter((l) => l.who === "arthur");
-  const currentLine = current ? arthurLines.find((l) => l.text === current) : undefined;
+  const bubble = current ?? arthurLines.at(-1)?.text ?? null;
   const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : face;
 
   return (
@@ -141,14 +142,15 @@ export function ArthurPanel({
             {asking && <span className="text-sm text-muted">thinking…</span>}
           </div>
           <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
-            {currentLine?.text ?? arthurLines.at(-1)?.text ?? placeholder}
+            {bubble ?? placeholder}
           </p>
         </div>
       </div>
 
-      {lines.length > 1 && (
+      {lines.some((l) => l.text !== bubble) && (
         <ol ref={threadRef} className="max-h-[220px] space-y-2 overflow-y-auto border-t border-line-soft px-4 py-3" aria-label="Conversation with Arthur">
-          {lines.slice(0, -1).map((l, i) => (
+          {/* Everything said so far except the line already in the bubble, so nothing shows twice. */}
+          {lines.filter((l) => !(l.who === "arthur" && l.text === bubble)).map((l, i) => (
             <li key={i} className={`text-sm ${l.who === "you" ? "text-right" : ""}`}>
               <span className={`inline-block max-w-[90%] rounded-[8px] px-3 py-1.5 text-left ${l.who === "you" ? "bg-chip text-ink" : "bg-parchment text-body2"}`}>
                 {l.text}

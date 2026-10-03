@@ -31,3 +31,10 @@ export function unknownMoves(text: string, allowed: Set<string>): string[] {
   }
   return [...bad];
 }
+
+/** Chess notation in prose: SAN moves, castling, or bare square names. Arthur's beginner notes must have none. */
+const NOTATION_RE = /\b(?:O-O(?:-O)?|[KQRBN][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8]|[a-h][1-8])\b/g;
+
+export function notationIn(text: string): string[] {
+  return [...new Set([...text.matchAll(NOTATION_RE)].map((m) => m[0]))];
+}

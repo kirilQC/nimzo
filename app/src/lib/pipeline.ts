@@ -3,8 +3,11 @@ import { z } from "zod";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { buildFacts, type MoveFacts, type PositionInput } from "@/lib/analysis/facts";
-import { classifyMistake, confidentMotifs } from "@/lib/classifier";
-import type { MaiaInfo } from "@/lib/classifier/types";
+import { buildFeatures, type EnginePosition, type MoveFeatures } from "@/lib/analysis/features";
+import { isSeverity } from "@/lib/analysis/math";
+import { jevClassify, JEV_MIN_PROBABILITY, type JevResult } from "@/lib/tags/jev";
+import { TAG_BY_ID } from "@/lib/tags/catalog";
+import type { MaiaFact } from "@/lib/tags/factsheet";
 import { logError } from "@/lib/log";
 
 /**
@@ -15,7 +18,11 @@ import { logError } from "@/lib/log";
 
 const POSITION_COLS = "ply, eval_cp, eval_mate, classification, best_move_san, best_move_uci, pv_san, multipv";
 
-/** Step 2: deterministic facts for each of my flagged moves. Replaces the game's mistake rows. */
+/**
+ * Step 2: deterministic facts. Features and rule tags for every move (both
+ * sides) go to move_features; the fuller fact sheet for each of my flagged
+ * moves goes to mistakes. Replaces any earlier rows for the game.
+ */
 export async function runFactsStep(gameId: string): Promise<{ mistakes: number }> {
   const db = await getDb();
   const { data: game } = await db.from(T.games).select("pgn, my_color, source").eq("id", gameId).single();
@@ -24,6 +31,26 @@ export async function runFactsStep(gameId: string): Promise<{ mistakes: number }
   if (error) throw new Error(`load positions: ${error.message}`);
 
   const facts = buildFacts({ pgn: game.pgn, myColor: game.my_color, positions: (positions ?? []) as PositionInput[] });
+  const features = buildFeatures({ pgn: game.pgn, myColor: game.my_color, positions: (positions ?? []) as EnginePosition[] });
+
+  const { error: delF } = await db.from(T.move_features).delete().eq("game_id", gameId);
+  if (delF) throw new Error(`clear move features: ${delF.message}`);
+  const featureRows = features.map((f) => ({
+    game_id: gameId,
+    ply: f.ply,
+    is_mine: f.mine,
+    side: f.side,
+    move_number: f.move_number,
+    san: f.san,
+    label: f.label,
+    phase: f.phase,
+    features: f,
+    tags: f.rules,
+  }));
+  for (let i = 0; i < featureRows.length; i += 200) {
+    const { error: e } = await db.from(T.move_features).insert(featureRows.slice(i, i + 200));
+    if (e) throw new Error(`insert move features: ${e.message}`);
+  }
 
   // Keep any Maia probabilities / tags already computed for unchanged plies? No: facts changed, so start clean.
   const { error: delErr } = await db.from(T.mistakes).delete().eq("game_id", gameId);
@@ -93,39 +120,82 @@ export async function saveMaia(gameId: string, payload: z.infer<typeof maiaPaylo
   }
 }
 
-/** Step 4: classify every mistake (Jev, falling back to Claude), then mark the game tagged. */
-export async function runTagStep(gameId: string): Promise<{ tagged: number; fallback: number }> {
-  const db = await getDb();
-  const [{ data: mistakes }, { data: settings }] = await Promise.all([
-    db.from(T.mistakes).select("id, ply, facts, maia").eq("game_id", gameId),
-    db.from(T.settings).select("thresholds").single(),
-  ]);
-  const minConf = Number((settings?.thresholds as { jev_min_confidence?: number } | null)?.jev_min_confidence ?? 0.6);
+/** Moves of mine that Jev reads: everything except book moves and forced replies. */
+function needsJev(f: MoveFeatures): boolean {
+  return f.mine && f.label !== "book" && f.label !== "forced" && f.label !== null;
+}
 
-  let fallback = 0;
-  const queue = [...(mistakes ?? [])];
+/** Confident tags for a move: every rule tag plus Jev tags it's sure about. */
+export function mergeTags(rules: string[], jev: JevResult | null): string[] {
+  const out = new Set(rules);
+  for (const [id, p] of Object.entries(jev?.tags ?? {})) if (p >= JEV_MIN_PROBABILITY) out.add(id);
+  return [...out];
+}
+
+/** The broad kind of mistake, from the tags (no model needed). */
+export function mistakeType(f: MoveFeatures, tags: string[]): string {
+  const groups = new Set(tags.map((t) => TAG_BY_ID.get(t)?.group));
+  if (tags.includes("time_scramble") || tags.includes("instant_blunder")) return "time_management";
+  if (groups.has("blunder") || groups.has("missed")) return "tactical";
+  if (f.phase === "opening" && groups.has("opening")) return "opening";
+  if (f.phase === "endgame") return "endgame_technique";
+  return "positional";
+}
+
+/**
+ * Step 4: Jev reads every one of my (non-book, non-forced) moves: why it was
+ * played, the cause of each mistake, and the judgment tags that fit. Results go
+ * to move_features; flagged moves also update their mistakes row.
+ */
+export async function runTagStep(gameId: string): Promise<{ tagged: number; failed: number; cost: number }> {
+  const db = await getDb();
+  const [{ data: rows, error }, { data: mistakes }] = await Promise.all([
+    db.from(T.move_features).select("ply, features").eq("game_id", gameId).eq("is_mine", true).order("ply"),
+    db.from(T.mistakes).select("id, ply, maia").eq("game_id", gameId),
+  ]);
+  if (error) throw new Error(`load move features: ${error.message}`);
+  const maia = new Map((mistakes ?? []).map((m) => [m.ply as number, (m.maia as MaiaFact) ?? null]));
+  const mistakeId = new Map((mistakes ?? []).map((m) => [m.ply as number, m.id as string]));
+
+  const queue = (rows ?? []).map((r) => r.features as MoveFeatures).filter(needsJev);
+  let failed = 0, cost = 0;
   const worker = async () => {
-    for (let m = queue.shift(); m; m = queue.shift()) {
-      const tags = await classifyMistake({ facts: m.facts as MoveFacts, maia: (m.maia as MaiaInfo) ?? null }, gameId);
-      if (tags.mistake_type.source === "fallback") fallback++;
-      const confident = (t: { value: string; confidence: number | null }) => ((t.confidence ?? 0) >= minConf ? t.value : null);
-      const { raw, overridden, ...stored } = tags;
-      const { error } = await db
-        .from(T.mistakes)
-        .update({
-          tags: { ...stored, overridden, provider_raw: raw ?? null },
-          motifs: confidentMotifs(tags, minConf),
-          mistake_type: confident(tags.mistake_type),
-          root_cause: confident(tags.root_cause),
-          phase: tags.phase.value,
-        })
-        .eq("id", m.id);
-      if (error) throw new Error(`save tags: ${error.message}`);
+    for (let f = queue.shift(); f; f = queue.shift()) {
+      let jev: JevResult | null = null;
+      try {
+        jev = await jevClassify(f, maia.get(f.ply) ?? null);
+        cost += jev.usage?.cost ?? 0;
+      } catch (e) {
+        failed++;
+        await logError("jev", e, { ply: f.ply }, gameId);
+      }
+      const tags = mergeTags(f.rules, jev);
+      const { error: e1 } = await db
+        .from(T.move_features)
+        .update({ tags, jev, intent: jev?.intent?.value ?? null, root_cause: jev?.root_cause?.value ?? null })
+        .eq("game_id", gameId)
+        .eq("ply", f.ply);
+      if (e1) throw new Error(`save move tags: ${e1.message}`);
+      const mid = mistakeId.get(f.ply);
+      if (mid && isSeverity(f.label)) {
+        const bad = tags.filter((t) => TAG_BY_ID.get(t)?.polarity === "bad");
+        const { error: e2 } = await db
+          .from(T.mistakes)
+          .update({
+            tags: { version: 2, rules: f.rules, jev, merged: tags },
+            motifs: bad,
+            mistake_type: mistakeType(f, tags),
+            root_cause: (jev?.root_cause?.confidence ?? 0) >= 0.5 ? jev!.root_cause!.value : null,
+            phase: f.phase,
+          })
+          .eq("id", mid);
+        if (e2) throw new Error(`save mistake tags: ${e2.message}`);
+      }
     }
   };
-  await Promise.all([worker(), worker(), worker(), worker()]);
+  await Promise.all(Array.from({ length: 8 }, worker));
   await db.from(T.games).update({ analysis_status: "tagged", analysis_updated_at: new Date().toISOString() }).eq("id", gameId);
-  return { tagged: mistakes?.length ?? 0, fallback };
+  return { tagged: (rows ?? []).length, failed, cost };
 }
 
 export async function failGame(gameId: string, scope: string, e: unknown) {
