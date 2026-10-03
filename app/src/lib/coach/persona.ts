@@ -1,4 +1,4 @@
-/** The coach character. Rename here; the voice is set by ELEVENLABS_VOICE_ID. */
+/** The coach character. His voice is the browser's built-in speech (VoiceProvider). */
 export const COACH = {
   name: "Arthur",
 } as const;

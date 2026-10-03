@@ -3,10 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Arthur's voice for the whole app. Lines play one at a time; a new topic can
- * interrupt the current one. Audio comes from /api/tts (synthesized once,
- * cached server-side). Browsers block sound until the first click on the page,
- * so a line requested before that waits and plays on the first click.
+ * Arthur's voice for the whole app, using the browser's built-in speech
+ * synthesis (free, runs on your computer). Lines play one at a time; a new
+ * topic can interrupt the current one. Browsers may block speech until the
+ * first click on the page, so a line requested before that waits for it.
  */
 
 type SpeakOpts = { interrupt?: boolean };
@@ -14,27 +14,31 @@ type Ctx = {
   speak: (text: string, opts?: SpeakOpts) => void;
   stop: () => void;
   speaking: boolean;
-  current: string | null; // text being spoken
+  current: string | null; // the line being spoken
   muted: boolean;
   setMuted: (m: boolean) => void;
   waitingForClick: boolean;
+  supported: boolean;
 };
 
 const VoiceContext = createContext<Ctx | null>(null);
 const MUTE_KEY = "nimzo.arthur.muted";
-const urls = new Map<string, Promise<string>>();
 
-function audioUrl(text: string): Promise<string> {
-  let p = urls.get(text);
-  if (!p) {
-    p = fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).then(async (res) => {
-      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Voice unavailable");
-      return URL.createObjectURL(await res.blob());
-    });
-    p.catch(() => urls.delete(text));
-    urls.set(text, p);
+/** Preferred voices for an older British club coach, best first; falls back to any English voice. */
+const PREFERRED = [/arthur/i, /george/i, /daniel/i, /uk english male/i, /ryan/i, /thomas/i, /oliver/i, /alfie/i];
+
+function pickVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  for (const re of PREFERRED) {
+    const v = voices.find((x) => re.test(x.name) && x.lang.toLowerCase().startsWith("en"));
+    if (v) return v;
   }
-  return p;
+  return voices.find((v) => v.lang.toLowerCase() === "en-gb") ?? voices.find((v) => v.lang.toLowerCase().startsWith("en")) ?? null;
+}
+
+/** Chrome cuts off long utterances, so speak sentence by sentence. */
+function sentences(text: string): string[] {
+  return (text.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) ?? [text]).map((s) => s.trim()).filter(Boolean);
 }
 
 export function VoiceProvider({ children }: { children: React.ReactNode }) {
@@ -42,83 +46,97 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [current, setCurrent] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
   const [waitingForClick, setWaitingForClick] = useState(false);
+  const [supported, setSupported] = useState(true);
   const queue = useRef<string[]>([]);
-  const audio = useRef<HTMLAudioElement | null>(null);
   const playing = useRef(false);
   const mutedRef = useRef(false);
-  const next = useRef<() => Promise<void>>(async () => {});
+  const generation = useRef(0); // bumps on stop() so stale callbacks are ignored
+  const next = useRef<() => void>(() => {});
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- browser-only capabilities and preferences, read after mount */
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setSupported(false);
+      return;
+    }
     try {
       const m = localStorage.getItem(MUTE_KEY) === "1";
       mutedRef.current = m;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a browser-only preference after mount
       setMutedState(m);
     } catch {
       // storage unavailable: default to sound on
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
+    window.speechSynthesis.getVoices(); // voices load asynchronously in some browsers
+    return () => window.speechSynthesis.cancel();
   }, []);
 
-  const playNext = useCallback(async () => {
-    if (playing.current || mutedRef.current) return;
+  const playNext = useCallback(() => {
+    if (playing.current || mutedRef.current || !("speechSynthesis" in window)) return;
     const text = queue.current[0];
     if (!text) return;
     playing.current = true;
-    try {
-      const url = await audioUrl(text);
-      if (queue.current[0] !== text || mutedRef.current) {
-        playing.current = false;
-        void next.current();
-        return;
-      }
-      const a = new Audio(url);
-      audio.current = a;
-      a.onended = () => {
-        queue.current.shift();
-        playing.current = false;
-        setSpeaking(false);
-        setCurrent(null);
-        void next.current();
-      };
-      try {
-        await a.play();
+    const gen = generation.current;
+    const voice = pickVoice();
+    const parts = sentences(text);
+    let i = 0;
+
+    const finish = () => {
+      if (gen !== generation.current) return;
+      queue.current.shift();
+      playing.current = false;
+      setSpeaking(false);
+      setCurrent(null);
+      next.current();
+    };
+
+    const sayPart = () => {
+      if (gen !== generation.current) return;
+      if (i >= parts.length) return finish();
+      const u = new SpeechSynthesisUtterance(parts[i++]!);
+      if (voice) u.voice = voice;
+      u.lang = voice?.lang ?? "en-GB";
+      u.rate = 0.95;
+      u.pitch = 0.85;
+      u.onstart = () => {
+        if (gen !== generation.current) return;
         setWaitingForClick(false);
         setSpeaking(true);
         setCurrent(text);
-      } catch (e) {
-        playing.current = false;
-        if ((e as DOMException).name === "NotAllowedError") {
-          // Autoplay blocked until the user interacts; resume on the first click or key press.
+      };
+      u.onend = sayPart;
+      u.onerror = (e) => {
+        if (gen !== generation.current) return;
+        if (e.error === "not-allowed") {
+          // Speech blocked until the user interacts; resume on the first click or key press.
+          playing.current = false;
           setWaitingForClick(true);
           const resume = () => {
             window.removeEventListener("pointerdown", resume);
             window.removeEventListener("keydown", resume);
             setWaitingForClick(false);
-            void next.current();
+            next.current();
           };
           window.addEventListener("pointerdown", resume, { once: true });
           window.addEventListener("keydown", resume, { once: true });
-        } else {
-          queue.current.shift();
-          void next.current();
+          return;
         }
-      }
-    } catch (e) {
-      console.warn("[arthur] voice unavailable:", (e as Error).message);
-      queue.current.shift();
-      playing.current = false;
-      void next.current();
-    }
+        if (e.error === "interrupted" || e.error === "canceled") return;
+        sayPart();
+      };
+      window.speechSynthesis.speak(u);
+    };
+    sayPart();
   }, []);
   useEffect(() => {
     next.current = playNext;
   }, [playNext]);
 
   const stop = useCallback(() => {
+    generation.current++;
     queue.current = [];
-    audio.current?.pause();
-    audio.current = null;
     playing.current = false;
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeaking(false);
     setCurrent(null);
   }, []);
@@ -126,13 +144,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const speak = useCallback(
     (text: string, opts?: SpeakOpts) => {
       const t = text.trim();
-      if (!t) return;
+      if (!t || !supported) return;
+      if (playing.current && queue.current[0] === t) return; // already saying exactly this
       if (opts?.interrupt) stop();
       if (queue.current.includes(t)) return;
       queue.current.push(t);
-      void playNext();
+      playNext();
     },
-    [playNext, stop],
+    [playNext, stop, supported],
   );
 
   const setMuted = useCallback(
@@ -149,7 +168,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     [stop],
   );
 
-  const value = useMemo(() => ({ speak, stop, speaking, current, muted, setMuted, waitingForClick }), [speak, stop, speaking, current, muted, setMuted, waitingForClick]);
+  const value = useMemo(
+    () => ({ speak, stop, speaking, current, muted, setMuted, waitingForClick, supported }),
+    [speak, stop, speaking, current, muted, setMuted, waitingForClick, supported],
+  );
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
 }
 
@@ -177,7 +199,8 @@ export function useSpeakOnce(onceKey: string | null, text: string | null) {
 
 /** Small mute switch for the nav. */
 export function VoiceToggle() {
-  const { muted, setMuted, speaking, waitingForClick } = useVoice();
+  const { muted, setMuted, waitingForClick, supported } = useVoice();
+  if (!supported) return null;
   return (
     <span className="inline-flex items-center gap-2">
       {waitingForClick && !muted && <span className="text-xs text-muted">Click anywhere to hear Arthur</span>}
@@ -187,7 +210,7 @@ export function VoiceToggle() {
         aria-pressed={!muted}
         aria-label={muted ? "Turn Arthur's voice on" : "Mute Arthur"}
         title={muted ? "Arthur is muted" : "Arthur's voice is on"}
-        className={`inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-line ${speaking ? "bg-chip text-walnut" : "bg-card text-body2"} hover:bg-chip`}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-line bg-card text-body2 hover:bg-chip"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M11 5L6 9H3v6h3l5 4z" fill="currentColor" />

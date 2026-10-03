@@ -118,13 +118,12 @@ export function ArthurPanel({
 
   const arthurLines = lines.filter((l) => l.who === "arthur");
   const speakingLine = current ? arthurLines.find((l) => l.text === current) : undefined;
-  const sayingHere = !!speakingLine;
   const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : (speakingLine?.expression ?? face);
 
   return (
     <section className="card p-0" aria-labelledby="arthur-h">
       <div className="flex gap-4 p-4">
-        <div className={`relative w-[150px] shrink-0 self-start overflow-hidden rounded-[10px] border-2 border-brass ${speaking && sayingHere ? "arthur-speaking" : ""}`}>
+        <div className="relative w-[150px] shrink-0 self-start overflow-hidden rounded-[10px] border-2 border-brass">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             key={shown}
@@ -140,14 +139,7 @@ export function ArthurPanel({
             <h2 id="arthur-h" className="text-xl">
               {COACH.name}
             </h2>
-            {speaking && sayingHere ? (
-              <span className="arthur-bars inline-flex items-end" aria-label="Arthur is speaking">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-              </span>
-            ) : asking ? (
+            {asking ? (
               <span className="text-sm text-muted">thinking…</span>
             ) : muted ? (
               <span className="text-sm text-muted">muted</span>
