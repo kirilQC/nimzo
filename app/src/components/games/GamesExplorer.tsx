@@ -27,7 +27,7 @@ export type ExplorerGame = {
   mistakes: number | null;
 };
 
-type SortKey = "end" | "opponent" | "oppRating" | "myRating" | "result" | "moves" | "accuracy" | "opening" | "timeClass";
+type SortKey = "end" | "opponent" | "oppRating" | "myRating" | "result" | "moves" | "accuracy" | "opening";
 const PAGE = 50;
 const CLASS_ORDER = ["bullet", "blitz", "rapid", "daily", "other"];
 const CLASS_COLOR: Record<string, string> = { bullet: "#9E2B25", blitz: "#C9832E", rapid: "#4E7A3A", daily: "#3F6E9A", other: "#7A6A58" };
@@ -231,52 +231,45 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
             {sorted.length !== games.length && " match"}
           </p>
         </div>
-        <table className="table">
+        <table className="table text-sm">
           <thead>
             <tr>
               <Th label="Date" k="end" sort={sort} onSort={sortBy} />
               <Th label="Opponent" k="opponent" sort={sort} onSort={sortBy} />
-              <Th label="Their rating" k="oppRating" sort={sort} onSort={sortBy} right />
-              <Th label="My rating" k="myRating" sort={sort} onSort={sortBy} right />
+              <Th label="Theirs" k="oppRating" sort={sort} onSort={sortBy} right />
+              <Th label="Mine" k="myRating" sort={sort} onSort={sortBy} right />
               <Th label="Result" k="result" sort={sort} onSort={sortBy} />
               <th scope="col">How it ended</th>
               <Th label="Moves" k="moves" sort={sort} onSort={sortBy} right />
-              <Th label="Time" k="timeClass" sort={sort} onSort={sortBy} />
               <Th label="Opening" k="opening" sort={sort} onSort={sortBy} />
               <Th label="Accuracy" k="accuracy" sort={sort} onSort={sortBy} right />
-              <th scope="col">
-                <span className="sr-only">Review</span>
-              </th>
             </tr>
           </thead>
           <tbody>
             {shown.map((g) => (
               <tr key={g.id}>
-                <td className="mono whitespace-nowrap text-body2" suppressHydrationWarning>
-                  {fmtDate(g.end)}
+                <td className="whitespace-nowrap text-body2" suppressHydrationWarning>
+                  <span className="mono">{fmtDate(g.end)}</span>
+                  <span className="block text-xs text-muted" title={g.timeControl ?? undefined}>
+                    {cap(g.timeClass)}
+                  </span>
                 </td>
                 <td className="whitespace-nowrap font-semibold text-ink">
                   <span className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full border border-line align-middle ${g.color === "white" ? "bg-white" : "bg-[#2b2724]"}`} title={`You played ${g.color}`} aria-label={`You played ${g.color}`} />
-                  {g.opponent}
+                  <Link href={`/games/${g.id}`} className="text-ink hover:underline" title={g.status === "imported" ? "Open and analyze this game" : "Review this game"}>
+                    {g.opponent}
+                  </Link>
                 </td>
                 <td className="mono text-right text-body2">{g.oppRating ?? "–"}</td>
                 <td className="mono text-right text-ink">{g.myRating ?? "–"}</td>
                 <td className={g.result === "win" ? "font-semibold text-[#4E7A3A]" : g.result === "loss" ? "font-semibold text-[color:var(--blunder-bg)]" : "text-body2"}>{RESULT_TEXT[g.result]}</td>
-                <td className="whitespace-nowrap text-body2">{g.ending}</td>
+                <td className="text-body2">{g.ending}</td>
                 <td className="mono text-right text-body2">{g.moves ?? "–"}</td>
-                <td className="whitespace-nowrap text-body2" title={g.timeControl ?? undefined}>
-                  {cap(g.timeClass)}
-                </td>
-                <td className="max-w-[200px] truncate text-walnut" title={[g.eco, g.opening].filter(Boolean).join(" ")}>
+                <td className="max-w-[150px] truncate text-walnut" title={[g.eco, g.opening].filter(Boolean).join(" ")}>
                   {g.opening ?? "—"}
                 </td>
                 <td className="mono text-right text-ink" title={g.accuracyChesscom !== null ? `chess.com: ${g.accuracyChesscom.toFixed(1)}` : undefined}>
-                  {g.accuracy !== null ? g.accuracy.toFixed(1) : g.status === "imported" ? <span className="text-muted">–</span> : "–"}
-                </td>
-                <td className="text-right">
-                  <Link href={`/games/${g.id}`} className="arrow-link">
-                    {g.status === "imported" ? "Analyze" : "Review"}
-                  </Link>
+                  {g.accuracy !== null ? g.accuracy.toFixed(1) : <span className="text-muted">–</span>}
                 </td>
               </tr>
             ))}

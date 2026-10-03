@@ -23,7 +23,7 @@ export default async function GamesPage() {
       moves: g.move_count,
       timeClass: g.time_class ?? "other",
       timeControl: g.time_control,
-      opening: g.opening_name,
+      opening: g.opening_name && g.opening_name !== "Undefined" ? g.opening_name : null,
       eco: g.eco,
       accuracy: g.accuracy_ours === null ? null : Number(g.accuracy_ours),
       accuracyChesscom: g.accuracy_chesscom === null ? null : Number(g.accuracy_chesscom),
@@ -35,7 +35,7 @@ export default async function GamesPage() {
   });
   return (
     <div>
-      <PageHeader title="My games" subtitle={`Every game imported from chess.com: ${rows.length.toLocaleString("en-US")} so far.`} />
+      <PageHeader title="My games" subtitle={`Every game imported from chess.com: ${rows.length.toLocaleString("en-US")} so far. Click an opponent to open the game.`} />
       <GamesExplorer games={rows} />
     </div>
   );

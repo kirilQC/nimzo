@@ -46,8 +46,8 @@ export function Board({ fen, orientation = "white", lastMove, badge, options, la
                 <div style={{ position: "relative", width: "100%", height: "100%" }}>
                   {children}
                   {square === badge.square && (
-                    <span style={{ position: "absolute", top: "-6%", right: "-6%", width: "42%", height: "42%", zIndex: 20, pointerEvents: "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,.35))" }}>
-                      <MoveIcon label={badge.label} size={100} />
+                    <span style={{ position: "absolute", top: "-10%", right: "-10%", width: "46%", height: "46%", zIndex: 20, pointerEvents: "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,.35))" }}>
+                      <MoveIcon label={badge.label} size="100%" />
                     </span>
                   )}
                 </div>

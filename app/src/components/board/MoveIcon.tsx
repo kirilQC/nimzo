@@ -1,7 +1,7 @@
 import { LABEL_BY_ID, type LabelId } from "@/lib/analysis/labels";
 
 /** Round badge for a move label: coloured disc with a white glyph. Drawn here, no external art. */
-export function MoveIcon({ label, size = 20, title }: { label: LabelId; size?: number; title?: string }) {
+export function MoveIcon({ label, size = 20, title }: { label: LabelId; size?: number | string; title?: string }) {
   const l = LABEL_BY_ID[label];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label={title ?? l.name} className="inline-block shrink-0">
@@ -24,15 +24,15 @@ function Text({ children, size = 13 }: { children: string; size?: number }) {
 function Glyph({ label }: { label: LabelId }) {
   switch (label) {
     case "brilliant":
-      return <Text size={12}>!!</Text>;
+      return <Text size={15}>!!</Text>;
     case "great":
-      return <Text size={14}>!</Text>;
+      return <Text size={17}>!</Text>;
     case "inaccuracy":
-      return <Text size={11}>?!</Text>;
+      return <Text size={14}>?!</Text>;
     case "mistake":
-      return <Text size={14}>?</Text>;
+      return <Text size={17}>?</Text>;
     case "blunder":
-      return <Text size={11}>??</Text>;
+      return <Text size={14}>??</Text>;
     case "best": // star
       return <path fill="#fff" d="M12 4.6l2.2 4.6 5 .6-3.7 3.5.9 5-4.4-2.4-4.4 2.4.9-5-3.7-3.5 5-.6z" />;
     case "excellent": // thumbs up

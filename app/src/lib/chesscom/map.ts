@@ -60,7 +60,7 @@ export function openingNameFromUrl(url: string | undefined | null): string | nul
     if (/^\d+\./.test(token)) break; // move sequence starts
     if (token) words.push(token);
   }
-  return words.length ? words.join(" ") : null;
+  return words.length && words.join(" ") !== "Undefined" ? words.join(" ") : null;
 }
 
 function pgnHeader(pgn: string, name: string): string | null {
