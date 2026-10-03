@@ -4,14 +4,19 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { runEngineAnalysis } from "@/lib/analysis/runGame";
 import { getEngine } from "@/lib/engine/stockfish";
+import { MAIA_MODEL, maiaPredict } from "@/lib/maia/browser";
 
 /**
- * Browser-side analysis queue. Runs Stockfish (WASM, in a Web Worker) over
- * FINISHED games one at a time while a Nimzo tab is open, then posts the raw
- * results to /api/games/[id]/engine. Never touches live chess.com games.
+ * Browser-side analysis queue. Runs Stockfish (WASM, in a Web Worker) and
+ * Maia (ONNX, WASM) over FINISHED games one at a time while a Nimzo tab is
+ * open, and drives the server steps. Never touches live chess.com games.
  */
 
-export type JobState = { state: "queued" | "analyzing" | "saving" | "done" | "failed"; progress: number; error?: string };
+export type JobState = {
+  state: "queued" | "analyzing" | "saving" | "maia" | "tagging" | "done" | "failed";
+  progress: number;
+  error?: string;
+};
 
 type Ctx = {
   jobs: Record<string, JobState>;
@@ -52,6 +57,21 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
     refreshTimer.current = setTimeout(() => router.refresh(), 400);
   }, [router]);
 
+  const post = async (url: string, body?: unknown) => {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((json as { error?: string }).error ?? `${url} failed (${r.status})`);
+    return json;
+  };
+
+  /**
+   * Resumable pipeline for one game, picking up from its stored status:
+   * imported -> engine (+ facts on the server) -> Maia (here) -> Jev tagging (server) -> tagged.
+   */
   const analyzeOne = useCallback(
     async (next: { id: string; force: boolean }) => {
       const id = next.id;
@@ -59,27 +79,58 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
         const res = await fetch(`/api/games/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error(`Couldn't load game (${res.status})`);
         const game = (await res.json()) as GameInfo;
-        if (game.analysis_status !== "imported" && !next.force) {
+        let status = next.force ? "imported" : game.analysis_status;
+        if (!["imported", "engine_done", "facts_done"].includes(status)) {
           setJob(id, { state: "done", progress: 1 });
           return;
         }
-        setJob(id, { state: "analyzing", progress: 0 });
-        const engine = getEngine();
-        engine.newGame();
-        const payload = await runEngineAnalysis({
-          pgn: game.pgn,
-          myColor: game.my_color,
-          engine,
-          depth,
-          onProgress: (done, total) => setJob(id, { progress: Math.min(0.99, done / total) }),
-        });
-        setJob(id, { state: "saving", progress: 0.99 });
-        const save = await fetch(`/api/games/${id}/engine`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!save.ok) throw new Error(((await save.json().catch(() => ({}))) as { error?: string }).error ?? `Save failed (${save.status})`);
+
+        if (status === "imported") {
+          setJob(id, { state: "analyzing", progress: 0 });
+          const engine = getEngine();
+          engine.newGame();
+          const payload = await runEngineAnalysis({
+            pgn: game.pgn,
+            myColor: game.my_color,
+            engine,
+            depth,
+            onProgress: (done, total) => setJob(id, { progress: Math.min(0.85, (done / total) * 0.85) }),
+          });
+          setJob(id, { state: "saving", progress: 0.86 });
+          await post(`/api/games/${id}/engine`, payload); // also runs the facts step
+          status = "facts_done";
+          scheduleRefresh();
+        } else if (status === "engine_done") {
+          await post(`/api/games/${id}/facts`);
+          status = "facts_done";
+        }
+
+        // Maia: how likely a player at your level is to play each flagged move. Best effort.
+        setJob(id, { state: "maia", progress: 0.88 });
+        try {
+          const { elo, items } = (await (await fetch(`/api/games/${id}/maia`, { cache: "no-store" })).json()) as {
+            elo: number;
+            items: { ply: number; fen_before: string; played_uci: string; best_uci: string | null }[];
+          };
+          if (items.length) {
+            const out = [];
+            for (const it of items) {
+              const r = await maiaPredict(it.fen_before, elo);
+              out.push({
+                ply: it.ply,
+                p_played: r.policy[it.played_uci] ?? 0,
+                p_best: it.best_uci ? (r.policy[it.best_uci] ?? 0) : null,
+                top: Object.entries(r.policy).slice(0, 5).map(([uci, p]) => ({ uci, p })),
+              });
+            }
+            await post(`/api/games/${id}/maia`, { model: MAIA_MODEL, elo, items: out });
+          }
+        } catch (e) {
+          console.warn("[maia] skipped:", (e as Error).message);
+        }
+
+        setJob(id, { state: "tagging", progress: 0.94 });
+        await post(`/api/games/${id}/tag`);
         setJob(id, { state: "done", progress: 1 });
         setBacklog((b) => Math.max(0, b - 1));
       } catch (e) {

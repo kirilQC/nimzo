@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SeverityChip, type Severity } from "@/components/ui";
 import { useAnalysis, type JobState } from "@/components/analysis/AnalysisProvider";
+import { loadMaia } from "@/lib/maia/browser";
 
 // FAIR PLAY: Session mode only polls Nimzo's own /api/sync, which imports
 // FINISHED games from chess.com's public archives. Nothing here reads a live
@@ -217,11 +218,11 @@ export function SessionCard({
       setLeftOpen(null);
       setGames([]);
       setSession(s);
-      // Wake the Maia engine on Render so it's warm by the time the first game ends.
-      postJson<{ status: string }>("/api/engine/wake")
-        .then((r) => setEngine(r.status === "not_configured" ? null : r.status === "awake" ? "awake" : "error"))
+      // Load Maia in the browser now so it's ready by the time the first game ends.
+      setEngine("waking");
+      loadMaia()
+        .then(() => setEngine("awake"))
         .catch(() => setEngine("error"));
-      setEngine((prev) => prev ?? "waking");
       await sync(s.id);
     } catch (e) {
       setError((e as Error).message);
@@ -282,8 +283,8 @@ export function SessionCard({
         </button>
       </div>
 
-      {engine === "waking" && <p className="mt-3 text-sm text-muted">Waking the engine…</p>}
-      {engine === "error" && <p className="mt-3 text-sm text-muted">The engine didn&apos;t answer. It will retry when a game needs it.</p>}
+      {engine === "waking" && <p className="mt-3 text-sm text-muted">Loading the engines…</p>}
+      {engine === "error" && <p className="mt-3 text-sm text-muted">Maia didn&apos;t load. It will retry when a game needs it.</p>}
       {leftOpen && !on && (
         <p className="mt-3 text-sm text-body2">
           A session from {new Date(leftOpen.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} was left open.

@@ -3,6 +3,7 @@ import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { buildAnalysis, enginePayloadSchema } from "@/lib/analysis/persist";
 import { logError } from "@/lib/log";
+import { runFactsStep } from "@/lib/pipeline";
 
 export const maxDuration = 30;
 
@@ -37,7 +38,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/games/[id]/
       .eq("id", id);
     if (upErr) throw new Error(`update game: ${upErr.message}`);
 
-    return NextResponse.json({ ok: true, ...totals });
+    // Step 2 runs right away: it's deterministic and fast.
+    const { mistakes } = await runFactsStep(id);
+    return NextResponse.json({ ok: true, ...totals, mistakes });
   } catch (e) {
     await logError("analysis.engine", e, { engine: parsed.data.engine, depth: parsed.data.depth }, id);
     await db.from(T.games).update({ analysis_status: "failed", analysis_error: (e as Error).message }).eq("id", id);

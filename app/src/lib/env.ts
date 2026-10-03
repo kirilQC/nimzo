@@ -17,8 +17,6 @@ const schema = z.object({
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   JEV_MODEL: z.string().default("typesafe/jev-1.13"),
   VOYAGE_API_KEY: z.string().min(1).optional(),
-  ENGINE_URL: z.string().url().optional(),
-  ENGINE_SHARED_SECRET: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

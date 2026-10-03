@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameReview, type ReviewData } from "@/components/review/GameReview";
-import { buildReviewData, type PositionRecord } from "@/lib/review";
+import { buildReviewData, type MistakeRecord, type PositionRecord } from "@/lib/review";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { SAMPLE_PGN } from "@/lib/chess/sample";
@@ -44,7 +44,9 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
       .select("ply, eval_cp, eval_mate, win_pct, classification, best_move_san, pv_san, multipv, clock_ms")
       .eq("game_id", id)
       .order("ply");
+    const { data: mistakes } = await db.from(T.mistakes).select("ply, tags, maia, explanation").eq("game_id", id);
     data = buildReviewData({
+      mistakes: (mistakes ?? []) as MistakeRecord[],
       gameId: game.id,
       pgn: game.pgn,
       myColor: game.my_color,

@@ -3,6 +3,45 @@ import type { CoachInfo, ReviewData, ReviewPly } from "@/components/review/GameR
 import { pgnToPositions } from "@/lib/chess/pgn";
 import { formatLine } from "@/lib/chess/lines";
 import { formatScore, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
+import { DIMENSIONS, motifLabel, tagLabel } from "@/lib/taxonomy";
+
+export type MistakeRecord = {
+  ply: number;
+  tags: {
+    mistake_type?: { value: string; confidence: number | null; source: string };
+    root_cause?: { value: string; confidence: number | null; source: string };
+    motifs?: Record<string, { value: boolean; confidence: number | null; source: string }>;
+  } | null;
+  maia: { elo: number; p_played: number; p_best: number | null } | null;
+  explanation: string | null;
+};
+
+/** "About 6 in 10 players at your level play this move." */
+export function maiaSentence(m: NonNullable<MistakeRecord["maia"]>): string {
+  const n = Math.round(m.p_played * 10);
+  const played =
+    m.p_played < 0.05 ? "Very few players at your level play this move" : n === 0 ? "About 1 in 20 players at your level play this move" : `About ${n} in 10 players at your level play this move`;
+  if (m.p_best === null) return `${played}.`;
+  const b = Math.round(m.p_best * 10);
+  const best = m.p_best < 0.05 ? "almost none find the engine's move" : b === 0 ? "about 1 in 20 find the engine's move" : `${b} in 10 find the engine's move`;
+  return `${played}; ${best}.`;
+}
+
+function tagChips(t: MistakeRecord["tags"], minConfidence: number) {
+  if (!t) return [];
+  const chips: { id: string; label: string; confidence: number | null }[] = [];
+  const motifs = Object.entries(t.motifs ?? {})
+    .filter(([, v]) => v.value)
+    .sort((a, b) => (b[1].confidence ?? 0) - (a[1].confidence ?? 0));
+  for (const [id, v] of motifs.slice(0, 3)) chips.push({ id, label: motifLabel(id), confidence: v.source === "detector" ? null : v.confidence });
+  for (const [dim, key] of [["mistake_type", "mistake_type"], ["root_cause", "root_cause"]] as const) {
+    const v = t[key];
+    if (!v) continue;
+    const unclear = (v.confidence ?? 0) < minConfidence;
+    chips.push({ id: `${dim}:${v.value}`, label: unclear ? `${tagLabel(dim as keyof typeof DIMENSIONS, v.value)} (unclear)` : tagLabel(dim as keyof typeof DIMENSIONS, v.value), confidence: v.confidence });
+  }
+  return chips;
+}
 
 export type PositionRecord = {
   ply: number;
@@ -31,7 +70,10 @@ export function buildReviewData(args: {
   status: string;
   error: string | null;
   positions: PositionRecord[];
+  mistakes?: MistakeRecord[];
+  minConfidence?: number;
 }): ReviewData {
+  const mistakeByPly = new Map((args.mistakes ?? []).map((m) => [m.ply, m]));
   const parsed = pgnToPositions(args.pgn);
   const mine = args.myColor === "white" ? "w" : "b";
   const byPly = new Map(args.positions.map((p) => [p.ply, p]));
@@ -67,7 +109,7 @@ export function buildReviewData(args: {
       const mateAfter = after ? mateFor(after, p.color) : null;
       coach[p.ply] = {
         ply: p.ply,
-        explanation: null,
+        explanation: mistakeByPly.get(p.ply)?.explanation ?? null,
         bestMoveSan: row.best_move_san ? formatLine(p.ply, [row.best_move_san]) : null,
         bestMoveEval: formatScore(top?.score ?? before),
         bestMoveNote: null,
@@ -77,8 +119,8 @@ export function buildReviewData(args: {
         missedMate: mateBefore !== null && mateBefore > 0 && (mateAfter === null || mateAfter <= 0),
         evalBefore: formatScore(before),
         evalAfter: formatScore(after),
-        tags: [],
-        maiaLine: null,
+        tags: tagChips(mistakeByPly.get(p.ply)?.tags ?? null, args.minConfidence ?? 0.6),
+        maiaLine: mistakeByPly.get(p.ply)?.maia ? maiaSentence(mistakeByPly.get(p.ply)!.maia!) : null,
         relatedLesson: null,
       };
     }
