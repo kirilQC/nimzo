@@ -1,0 +1,71 @@
+import type { ReviewSummary } from "./GameReview";
+
+const VERDICT: Record<string, { label: string; className: string }> = {
+  excellent: { label: "Excellent game", className: "bg-[#e3efd6] text-[#3d6b22]" },
+  good: { label: "Good game", className: "bg-[#e8f0dc] text-[#4e7a3a]" },
+  mixed: { label: "Mixed game", className: "bg-[#f6ecd2] text-[#7a5a14]" },
+  rough: { label: "Rough game", className: "bg-[#f6dcd6] text-[#8a2c22]" },
+};
+
+/** Arthur's game summary in a fixed shape: story, how the advantage moved, where you fell short, what went well, the one lesson. */
+export function GameSummary({ summary }: { summary: ReviewSummary }) {
+  const wentWell = Array.isArray(summary.went_well) ? summary.went_well : summary.went_well ? [summary.went_well] : [];
+  const v = summary.verdict ? VERDICT[summary.verdict] : undefined;
+
+  // Older reviews (before the structured format) only have an overview.
+  if (!summary.story) {
+    return (
+      <section className="card p-6" aria-labelledby="summary-card-h">
+        <h2 id="summary-card-h" className="text-xl">
+          {summary.headline ?? "Game summary"}
+        </h2>
+        <p className="mt-2 text-body2">{summary.overview ?? summary.key_moment}</p>
+        {summary.work_on && <p className="mt-3 font-semibold text-ink">{summary.work_on}</p>}
+        <p className="mt-3 text-sm text-muted">Reanalyze this game to get the newer, fuller summary.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card p-6" aria-labelledby="summary-card-h">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h2 id="summary-card-h" className="text-xl">
+          {summary.headline}
+        </h2>
+        {v && <span className={`chip ${v.className}`}>{v.label}</span>}
+      </div>
+      <div className="mt-3 space-y-3 text-[0.9875rem] leading-relaxed text-body2">
+        {summary.story.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </div>
+      {summary.momentum && (
+        <p className="mt-4 rounded-[8px] bg-parchment px-3 py-2 text-sm text-ink">
+          <span className="font-semibold">How the game went: </span>
+          {summary.momentum}
+        </p>
+      )}
+      {!!summary.fell_short?.length && (
+        <div className="mt-4">
+          <h3 className="eyebrow mb-1.5">Where you fell short</h3>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-[color:var(--blunder-bg)]">
+            {summary.fell_short.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!!wentWell.length && (
+        <div className="mt-4">
+          <h3 className="eyebrow mb-1.5">What went well</h3>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-[#4e7a3a]">
+            {wentWell.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {summary.conclusion && <p className="mt-4 border-t border-line-soft pt-3 font-semibold text-ink">{summary.conclusion}</p>}
+    </section>
+  );
+}

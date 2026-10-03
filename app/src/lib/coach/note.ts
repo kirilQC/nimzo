@@ -5,6 +5,7 @@ import { RPC, T } from "@/lib/supabase/tables";
 import { env } from "@/lib/env";
 import { motifLabel } from "@/lib/taxonomy";
 import { structuredCall } from "./claude";
+import { noDashes } from "./text";
 import { COACH_NOTE_TASK, COACH_VOICE } from "./prompts";
 
 export const NOTE_WINDOW = 30;
@@ -32,7 +33,7 @@ export async function refreshCoachNote(): Promise<string | null> {
     effort: "low",
     maxTokens: 2000,
   });
-  const note = data.note.trim();
+  const note = noDashes(data.note.trim());
   await db.from(T.settings).update({ coach_note: note, coach_note_updated_at: new Date().toISOString() }).eq("id", true);
   return note;
 }

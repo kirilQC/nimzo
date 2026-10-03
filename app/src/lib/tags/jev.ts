@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import type { MoveFeatures } from "@/lib/analysis/features";
 import { isSeverity } from "@/lib/analysis/math";
-import { INTENTS, JEV_TAGS, ROOT_CAUSES_V2, type TagDef } from "./catalog";
+import { INTENTS, JEV_CRITERIA, JEV_TAGS, KB_CATEGORIES, PRINCIPLES, ROOT_CAUSES_V2, type TagDef } from "./catalog";
 import { factSheet, type MaiaFact } from "./factsheet";
 
 /**
@@ -13,7 +13,8 @@ import { factSheet, type MaiaFact } from "./factsheet";
  * chess from notation) and answers only judgment questions: why the move was
  * played, the reason for a mistake, and yes/no for each judgment tag that fits
  * the moment (phase, good or bad move). Tags that code can decide for certain
- * are never asked.
+ * are never asked. Criteria and the category/principle questions come from the
+ * knowledge base (lib/knowledge), so Jev judges by the rules Arthur teaches.
  */
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
@@ -29,13 +30,15 @@ export type JevResult = {
   tags: Record<string, number>; // tag id -> probability it applies
   intent: { value: string; confidence: number | null } | null;
   root_cause: { value: string; confidence: number | null } | null;
+  category: { value: string; confidence: number | null } | null; // knowledge base 1.2 category
+  principle: { value: string; confidence: number | null } | null; // knowledge base principle broken
   usage: { cost: number | null; input_tokens: number; output_tokens: number } | null;
   model: string;
 };
 
 /**
  * Board-fact preconditions for judgment tags. Graded against Opus on 60 of the
- * player's mistakes (scripts/_calib), Jev over-applied these when asked blindly;
+ * player's mistakes (scripts/calibrate-jev.mts), Jev over-applied these when asked blindly;
  * asking only when the facts make the tag possible removes most false yeses.
  */
 const GATES: Record<string, (f: MoveFeatures) => boolean> = {
@@ -61,15 +64,11 @@ const GATES: Record<string, (f: MoveFeatures) => boolean> = {
   neglected_king_safety: (f) => !f.king.castled_after || f.king.zone_attackers_after >= 2,
 };
 
-/** Tags Jev couldn't judge reliably in grading (it said yes where Opus never did); not asked. */
-const RETIRED = new Set(["overcomplicated", "lost_initiative", "ignored_opponent_plan"]);
-
 /** Which judgment tags to ask about for this move. */
 export function questionsFor(f: MoveFeatures): TagDef[] {
   const flagged = isSeverity(f.label);
   const goodMove = !flagged && ["brilliant", "great", "best", "excellent", "good"].includes(f.label ?? "");
   return JEV_TAGS.filter((t) => {
-    if (RETIRED.has(t.id)) return false;
     if (GATES[t.id] && !GATES[t.id]!(f)) return false;
     const on = t.ask?.on ?? (t.polarity === "good" ? "good" : "flagged");
     if (on === "flagged" && !flagged) return false;
@@ -95,11 +94,23 @@ export function buildRequest(f: MoveFeatures, maia: MaiaFact) {
         "Why did the player most likely make this mistake? Use the threats before the move, the opponent's best answer, the clock, and how common the move is among similar players. Choose 'unclear' if the facts don't point to one cause.",
       criteria: Object.fromEntries(ROOT_CAUSES_V2.map((r) => [r.id, r.description])),
     };
+  if (flagged) {
+    questions.category = {
+      type: "choice",
+      instructions: "Which kind of mistake is this, using a coach's six categories? Pick the one that best explains why it lost ground.",
+      criteria: Object.fromEntries(KB_CATEGORIES.map((c) => [c.id, c.description])),
+    };
+    questions.principle = {
+      type: "choice",
+      instructions: "Which coaching principle, had the player followed it, would most likely have prevented this mistake?",
+      criteria: Object.fromEntries(PRINCIPLES.map((p) => [p.id, p.description])),
+    };
+  }
   for (const t of questionsFor(f)) {
     questions[`tag_${t.id}`] = {
       type: "noul",
-      instructions: `Does this describe the move? "${t.label}": ${t.criteria ?? t.plain} Answer only from the facts given; if the facts don't show it, answer no.`,
-      criteria: { true: `Yes: ${t.criteria ?? t.plain}`, false: "No, or the facts don't show it." },
+      instructions: `Does this describe the move? "${t.label}": ${JEV_CRITERIA[t.id] ?? t.criteria ?? t.plain} Answer only from the facts given; if the facts don't show it, answer no.`,
+      criteria: { true: `Yes: ${JEV_CRITERIA[t.id] ?? t.criteria ?? t.plain}`, false: "No, or the facts don't show it." },
     };
   }
   const state = { player_move: f.san, facts: factSheet(f, maia) };
@@ -145,6 +156,8 @@ function toResult(d: z.infer<typeof responseSchema>): JevResult {
     tags,
     intent: choice(d.answers.intent, INTENTS),
     root_cause: choice(d.answers.root_cause, ROOT_CAUSES_V2),
+    category: choice(d.answers.category, KB_CATEGORIES),
+    principle: choice(d.answers.principle, PRINCIPLES),
     usage: d.usage ? { cost: d.usage.cost ?? null, input_tokens: d.usage.input_tokens, output_tokens: d.usage.output_tokens } : null,
     model: d.model,
   };

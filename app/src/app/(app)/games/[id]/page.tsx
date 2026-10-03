@@ -50,12 +50,13 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
     const [{ data: mistakes }, { data: review }, { data: notes }] = await Promise.all([
       db.from(T.mistakes).select("ply, tags, maia, explanation").eq("game_id", id),
       db.from(T.game_reviews).select("summary").eq("game_id", id).maybeSingle(),
-      db.from(T.move_features).select("ply, note").eq("game_id", id).not("note", "is", null),
+      db.from(T.move_features).select("ply, note, tags").eq("game_id", id),
     ]);
     data = buildReviewData({
       mistakes: (mistakes ?? []) as MistakeRecord[],
       summary: (review?.summary as ReviewData["summary"]) ?? null,
-      notes: new Map((notes ?? []).map((n) => [n.ply as number, n.note as string])),
+      notes: new Map((notes ?? []).filter((n) => n.note).map((n) => [n.ply as number, n.note as string])),
+      moveTags: new Map((notes ?? []).map((n) => [n.ply as number, (n.tags as string[] | null) ?? []])),
       result: game.result as ReviewData["result"],
       accuracy: game.accuracy_ours === null ? null : Number(game.accuracy_ours),
       gameId: game.id,

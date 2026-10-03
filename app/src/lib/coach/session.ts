@@ -7,6 +7,7 @@ import { parseClock } from "@/lib/chess/pgn";
 import type { MoveFacts } from "@/lib/analysis/facts";
 import { MOTIFS, motifLabel } from "@/lib/taxonomy";
 import { structuredCall } from "./claude";
+import { noDashes } from "./text";
 import { COACH_VOICE, SESSION_SUMMARY_TASK } from "./prompts";
 
 export const CLOCK_BUCKETS = [
@@ -101,9 +102,9 @@ export async function summarizeSession(sessionId: string): Promise<SessionSummar
   });
 
   const summary: SessionSummary = {
-    headline: data.headline.trim(),
-    takeaway: data.takeaway.trim(),
-    next_step: { motif: data.next_step_motif, label: data.next_step_label.trim(), href: `/learn?drill=${data.next_step_motif}` },
+    headline: noDashes(data.headline.trim()),
+    takeaway: noDashes(data.takeaway.trim()),
+    next_step: { motif: data.next_step_motif, label: noDashes(data.next_step_label.trim()), href: `/learn?drill=${data.next_step_motif}` },
     stats,
     clock_buckets: buckets,
   };

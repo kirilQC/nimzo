@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { COACH } from "@/lib/coach/persona";
 import { EXPRESSIONS, expressionSrc, type Expression } from "@/lib/coach/expressions";
 
-export type ArthurSay = { text: string; expression: Expression };
+export type MoveTag = { id: string; label: string; polarity: "good" | "bad" };
+export type ArthurSay = { text: string; expression: Expression; ply?: number; tags?: MoveTag[] };
+type Explained = { text: string; learn: { id: string; title: string } | null };
 type Line = { who: "arthur" | "you"; text: string; expression?: Expression };
 
 const SETTLE_MS = 12_000; // back to a warm smile after reacting
@@ -13,8 +15,8 @@ const SLEEPY_MS = 4 * 60_000; // nods off if you've been away a while
 /**
  * Arthur's corner of the review page: his portrait (whose expression follows
  * the moment), what he's saying now, and the back-and-forth. He opens with the
- * game summary, explains each flagged move as you step to it, and answers
- * questions about the game.
+ * game's headline, says one line about every move you step to (with that move's
+ * tags underneath: click one and he explains why it fits), and answers questions.
  */
 export function ArthurPanel({
   gameId,
@@ -37,6 +39,10 @@ export function ArthurPanel({
   const [face, setFace] = useState<Expression>(opening ? "cap_tip" : "warm_smile");
   const [activity, setActivity] = useState(0);
   const [current, setCurrent] = useState<string | null>(null); // the line on show
+  const [openTag, setOpenTag] = useState<string | null>(null); // "ply:tag" being explained
+  const [explained, setExplained] = useState<Record<string, Explained>>({});
+  const [explaining, setExplaining] = useState<string | null>(null);
+  const [allTags, setAllTags] = useState(false); // show every tag, not just the top six
   const said = useRef(new Set<string>());
   const threadRef = useRef<HTMLOListElement>(null);
 
@@ -61,14 +67,16 @@ export function ArthurPanel({
 
   // Arthur reacting to what's on screen (new line + face) is a side effect of navigation, so it lives in effects.
   /* eslint-disable react-hooks/set-state-in-effect */
-  // Opening: the game summary, once.
+  // Opening: the game's headline, once (the full summary has its own card).
   useEffect(() => {
-    if (opening) say(opening);
+    if (opening) say(opening, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opening?.text]);
 
   // Stepping onto a move: Arthur reacts and says his one line about it.
   useEffect(() => {
+    setOpenTag(null);
+    setAllTags(false);
     if (focus) say(focus, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.text]);
@@ -89,6 +97,37 @@ export function ArthurPanel({
     const el = threadRef.current; // scroll the conversation box only, never the page
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines]);
+
+  async function explainTag(tag: MoveTag, movePly: number) {
+    if (!gameId) return;
+    const key = `${movePly}:${tag.id}`;
+    if (openTag === key) return setOpenTag(null);
+    setOpenTag(key);
+    setError(null);
+    if (explained[key]) {
+      setFace("explaining");
+      setActivity((n) => n + 1);
+      return;
+    }
+    setExplaining(key);
+    try {
+      const res = await fetch(`/api/games/${gameId}/explain-tag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ply: movePly, tag: tag.id }),
+      });
+      const json = (await res.json().catch(() => ({}))) as Explained & { error?: string };
+      if (!res.ok || !json.text) throw new Error(json.error ?? "Arthur couldn't explain that just now.");
+      setExplained((m) => ({ ...m, [key]: { text: json.text, learn: json.learn } }));
+      setFace(tag.polarity === "good" ? "pleased" : "explaining");
+      setActivity((n) => n + 1);
+    } catch (err) {
+      setError((err as Error).message);
+      setFace("shrug");
+    } finally {
+      setExplaining(null);
+    }
+  }
 
   async function ask(e: React.FormEvent) {
     e.preventDefault();
@@ -118,7 +157,10 @@ export function ArthurPanel({
 
   const arthurLines = lines.filter((l) => l.who === "arthur");
   const bubble = current ?? arthurLines.at(-1)?.text ?? null;
-  const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : face;
+  const shown: Expression = asking || explaining ? "thinking" : typing && question.trim() ? "listening" : face;
+  // Tags belong to the move line in the bubble, not to answers or the headline.
+  const moveTags = focus && bubble === focus.text && focus.ply ? (focus.tags ?? []) : [];
+  const openExplanation = openTag ? explained[openTag] : undefined;
 
   return (
     <section className="card p-0" aria-labelledby="arthur-h">
@@ -144,6 +186,54 @@ export function ArthurPanel({
           <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
             {bubble ?? placeholder}
           </p>
+          {moveTags.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="What happened on this move. Click a tag for Arthur's explanation.">
+              {(allTags ? moveTags : moveTags.slice(0, 6)).map((t) => {
+                const key = `${focus!.ply}:${t.id}`;
+                const active = openTag === key;
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      onClick={() => void explainTag(t, focus!.ply!)}
+                      aria-expanded={active}
+                      disabled={!gameId}
+                      className={`rounded-full border px-2.5 py-1 text-[0.8125rem] font-semibold transition-colors ${
+                        t.polarity === "good"
+                          ? active
+                            ? "border-[#4e7a3a] bg-[#4e7a3a] text-white"
+                            : "border-[#bcd3a8] bg-[#eef5e6] text-[#3d6b22] hover:bg-[#e2eed6]"
+                          : active
+                            ? "border-[color:var(--blunder-bg)] bg-[color:var(--blunder-bg)] text-white"
+                            : "border-[#e6c3bd] bg-[#fbeeeb] text-[#8a2c22] hover:bg-[#f6e0db]"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  </li>
+                );
+              })}
+              {moveTags.length > 6 && !allTags && (
+                <li>
+                  <button type="button" onClick={() => setAllTags(true)} className="rounded-full px-2 py-1 text-[0.8125rem] text-muted underline-offset-2 hover:underline">
+                    {moveTags.length - 6} more
+                  </button>
+                </li>
+              )}
+            </ul>
+          )}
+          {openTag && moveTags.some((t) => openTag === `${focus!.ply}:${t.id}`) && (
+            <div className="mt-3 rounded-[8px] bg-parchment px-3 py-2.5 text-sm leading-relaxed text-ink" aria-live="polite">
+              {explaining === openTag ? (
+                <span className="text-muted">Arthur is thinking about why…</span>
+              ) : openExplanation ? (
+                <>
+                  <p>{openExplanation.text}</p>
+                  {openExplanation.learn && <p className="mt-1.5 text-xs text-muted">From the lesson: {openExplanation.learn.title}</p>}
+                </>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 

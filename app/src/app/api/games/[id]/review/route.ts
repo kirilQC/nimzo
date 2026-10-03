@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { runReviewStep } from "@/lib/coach/review";
 import { failGame } from "@/lib/pipeline";
 
-export const maxDuration = 120;
+export const maxDuration = 300; // one long Claude call, plus one rewrite if a house rule is broken
 
 /** Step 5: Claude explains each flagged move and summarizes the game. */
 export async function POST(_req: Request, ctx: RouteContext<"/api/games/[id]/review">) {

@@ -71,6 +71,12 @@ export type PositionRecord = {
   clock_ms: number | null;
 };
 
+const GROUP_ORDER = ["blunder", "missed", "found", "opening", "king", "trade", "structure", "endgame", "thinking", "strategy", "clock", "good", "context"];
+/** Orders a move's tags for display: bad before good, certain (rule) before judged, then by how instructive the group is. */
+function tagRank(t: { polarity: string; source: string; group: string }): number {
+  return (t.polarity === "bad" ? 0 : 1000) + (t.source === "rule" ? 0 : 100) + GROUP_ORDER.indexOf(t.group);
+}
+
 /** The mover's winning chances (0-100) from a stored position's White win%. */
 function winOf(p: PositionRecord | undefined, color: "w" | "b"): number | null {
   if (!p || p.win_pct === null || p.win_pct === undefined) return null;
@@ -99,6 +105,7 @@ export function buildReviewData(args: {
   result?: ReviewData["result"];
   accuracy?: number | null;
   notes?: Map<number, string>;
+  moveTags?: Map<number, string[]>;
 }): ReviewData {
   const mistakeByPly = new Map((args.mistakes ?? []).map((m) => [m.ply, m]));
   const parsed = pgnToPositions(args.pgn);
@@ -120,6 +127,11 @@ export function buildReviewData(args: {
       severity: isSeverity(row?.classification) ? row.classification : null,
       label: isLabelId(row?.classification) ? row.classification : null,
       note: args.notes?.get(p.ply) ?? null,
+      tags: (args.moveTags?.get(p.ply) ?? [])
+        .map((id) => TAG_BY_ID.get(id))
+        .filter((t): t is NonNullable<typeof t> => !!t && t.polarity !== "neutral")
+        .sort((a, b) => tagRank(a) - tagRank(b))
+        .map((t) => ({ id: t.id, label: t.label, polarity: t.polarity as "good" | "bad" })),
       bestUci: row?.best_move_uci ?? null,
       whitePct: row?.win_pct !== null && row?.win_pct !== undefined ? Number(row.win_pct) : null,
     };

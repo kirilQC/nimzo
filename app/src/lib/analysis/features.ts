@@ -2,6 +2,7 @@ import { Chess, type Color, type Square } from "chess.js";
 import { pgnToPositions } from "../chess/pgn";
 import { mateFor, sideWinPct, isSeverity, type Score } from "./math";
 import { lineHasBackRankMate } from "./detectors";
+import { trapInGame } from "../knowledge/traps";
 import {
   NAME,
   developedMinors,
@@ -55,6 +56,9 @@ export type MoveFeatures = {
   best: { san: string | null; piece: string | null; pattern: MovePattern | null; material_gain: number | null };
   reply: { san: string | null; piece: string | null; pattern: MovePattern | null; captures_square: string | null; material_after: number | null; mate_threat: boolean; back_rank_mate: boolean };
   bishops_before: number; // the mover's bishops before the move (for the bishop pair)
+  trap: { name: string; lesson: string; role: "fell" | "set" } | null; // a named opening trap from the knowledge base
+  mate_pattern: "back_rank" | "smothered" | null; // when this move is checkmate
+  taken_piece_defenders_pinned: boolean; // the piece the reply takes was "defended" only by pinned pieces
   material: { before: number; after: number };
   threats_before: { piece: string; square: string }[]; // mover's pieces the opponent could win before the move
   hanging_after: { piece: string; square: string }[]; // ... and after it
@@ -145,6 +149,7 @@ export function buildFeatures(args: { pgn: string; myColor: "white" | "black"; p
   const fired = { w: new Set<string>(), b: new Set<string>() }; // once-per-game rules
   const arrivedAt = { w: new Map<string, number>(), b: new Map<string, number>() }; // square -> ply a piece moved there
   const lastClock: Record<Color, number | null> = { w: null, b: null };
+  const trap = trapInGame(game.plies.map((q) => q.san));
 
   for (const p of game.plies) {
     const mover = p.color;
@@ -216,6 +221,21 @@ export function buildFeatures(args: { pgn: string; myColor: "white" | "black"; p
         back_rank_mate: next?.pv_san?.length ? lineHasBackRankMate(p.fenAfter, next.pv_san, mover) : false,
       },
       bishops_before: cb.board().flat().filter((q) => q?.type === "b" && q.color === mover).length,
+      trap:
+        trap && p.ply === trap.ply
+          ? { name: trap.trap.name, lesson: trap.trap.lesson, role: "fell" }
+          : trap && p.ply === trap.ply + 1 && p.san.replace(/[+#]/g, "") === (trap.trap.moves[trap.ply] ?? "").replace(/[+#]/g, "")
+            ? { name: trap.trap.name, lesson: trap.trap.lesson, role: "set" }
+            : null,
+      mate_pattern: deliversMate ? matePattern(ca, opp, p.to as Square) : null,
+      taken_piece_defenders_pinned: (() => {
+        if (!replyTo || !replyPattern?.captures) return false;
+        const target = ca.get(replyTo as Square);
+        if (!target || target.color !== mover) return false;
+        const defenders = ca.attackers(replyTo as Square, mover);
+        const pinned = new Set(pinsAgainst(ca, mover).filter((x) => x.absolute).map((x) => x.pinned.sq));
+        return defenders.length > 0 && defenders.every((d) => pinned.has(d));
+      })(),
       material: { before: matBefore, after: matAfter },
       threats_before: threatsBefore,
       hanging_after: hangingAfter,
@@ -307,6 +327,14 @@ export function ruleTags(f: MoveFeatures, ctx: RuleCtx): string[] {
   if (sev && P?.captures) add("bad_exchange", value(f.piece) - value(P.captures) >= 2 && f.reply.captures_square === f.uci.slice(2, 4));
   add("stalemated_opponent", f.stalemate && f.win_before >= 70);
   add("back_rank_weakness", sev && f.reply.back_rank_mate);
+  add("queen_trapped", sev && R?.traps_piece === "queen");
+  add("pinned_defender_illusion", sev && !!replyTakes && f.taken_piece_defenders_pinned);
+  const oppPrev = ctx.out.at(-1);
+  add("rushed_after_gift", bigSev && !!oppPrev && ["blunder", "miss", "mistake"].includes(oppPrev.label ?? "") && f.clock.spent_s !== null && f.clock.spent_s <= 3);
+  add("fell_for_trap", f.trap?.role === "fell");
+  add("set_trap", f.trap?.role === "set");
+  add("delivered_back_rank_mate", f.mate_pattern === "back_rank");
+  add("delivered_smothered_mate", f.mate_pattern === "smothered");
 
   // Missed chances: the engine's move did something and the player chose otherwise.
   const missedCtx = sev && !f.played_best;
@@ -408,6 +436,30 @@ export function ruleTags(f: MoveFeatures, ctx: RuleCtx): string[] {
   add("defended_threat", good && f.threats_before.some((x) => value(x.piece) >= 3) && !f.hanging_after.some((h) => value(h.piece) >= 3));
 
   return [...t];
+}
+
+/** Named mate shapes from the knowledge base (5.1 back rank, 5.2 smothered) for a mating move. */
+function matePattern(c: Chess, victim: Color, mateSq: Square): "back_rank" | "smothered" | null {
+  const king = c.board().flat().find((q) => q?.type === "k" && q.color === victim);
+  if (!king) return null;
+  const k = king.square as string;
+  const mater = c.get(mateSq);
+  const backRank = victim === "w" ? "1" : "8";
+  if (mater && (mater.type === "r" || mater.type === "q") && k[1] === backRank && mateSq[1] === backRank) return "back_rank";
+  if (mater?.type === "n") {
+    const f = k.charCodeAt(0), r = Number(k[1]);
+    let boxed = true;
+    for (let df = -1; df <= 1; df++)
+      for (let dr = -1; dr <= 1; dr++) {
+        if (!df && !dr) continue;
+        const ff = f + df, rr = r + dr;
+        if (ff < 97 || ff > 104 || rr < 1 || rr > 8) continue;
+        const q = c.get(`${String.fromCharCode(ff)}${rr}` as Square);
+        if (!q || q.color !== victim) boxed = false;
+      }
+    if (boxed) return "smothered";
+  }
+  return null;
 }
 
 export const _internal = { mateInOneThreat, playLine, phaseOf };

@@ -7,9 +7,10 @@ import { buildFeatures, type MoveFeatures } from "../src/lib/analysis/features";
 import { isSeverity } from "../src/lib/analysis/math";
 import { jevClassify, questionsFor } from "../src/lib/tags/jev";
 import { factSheet } from "../src/lib/tags/factsheet";
+import { JEV_CRITERIA } from "../src/lib/tags/catalog";
 import { structuredCall } from "../src/lib/coach/claude";
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)!);
-const OUT = "../calibration/jev-vs-opus.json"; // saved answers; delete to regrade from scratch
+const OUT = process.env.CALIB_OUT ?? "../calibration/jev-vs-opus-kb.json"; // saved answers; delete to regrade from scratch
 const N = Number(process.argv[2] ?? 60);
 type Item = { game: string; ply: number; san: string; label: string; jev: Record<string, number>; opus: Record<string, boolean> };
 const done: Item[] = existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : [];
@@ -30,7 +31,7 @@ if (done.length < N) {
     const jev = await jevClassify(p.f, null);
     const schema = z.object({ answers: z.object(Object.fromEntries(qs.map((q) => [q.id, z.boolean()]))) });
     const system = "You are a strong chess coach grading tags on a beginner's move. You get verified facts about the move (computed by code and an engine; trust them) and a list of tags. For each tag answer true only if the facts clearly show it applies to this move, false otherwise. Be strict: when in doubt, false.";
-    const user = JSON.stringify({ facts: factSheet(p.f, null), tags: qs.map((q) => ({ id: q.id, label: q.label, meaning: q.criteria ?? q.plain })) });
+    const user = JSON.stringify({ facts: factSheet(p.f, null), tags: qs.map((q) => ({ id: q.id, label: q.label, meaning: JEV_CRITERIA[q.id] ?? q.criteria ?? q.plain })) });
     const { data } = await structuredCall({ model: "claude-opus-5-5", system, user, schema, effort: "medium", maxTokens: 4000 });
     done.push({ game: p.game, ply: p.f.ply, san: p.f.san, label: p.f.label!, jev: jev.tags, opus: data.answers as Record<string, boolean> });
     writeFileSync(OUT, JSON.stringify(done, null, 1));

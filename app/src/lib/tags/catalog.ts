@@ -75,6 +75,10 @@ export const TAGS: TagDef[] = [
   r("blunder", "bad", "moved_pinned_piece_line", "Broke a pin badly", "You moved a pinned piece and exposed something more valuable behind it."),
   r("blunder", "bad", "stalemated_opponent", "Stalemated a winning game", "You were winning but left your opponent with no legal moves: a draw."),
   r("blunder", "bad", "back_rank_weakness", "Back-rank weakness", "Your king was stuck on the back row with no escape square."),
+  r("blunder", "bad", "queen_trapped", "Let your queen get trapped", "Your queen ran out of safe squares and could be won."),
+  r("blunder", "bad", "pinned_defender_illusion", "Counted on a pinned defender", "The piece you thought was protecting yours was pinned, so it couldn't really help."),
+  r("blunder", "bad", "fell_for_trap", "Fell for an opening trap", "You walked into a well known opening trap."),
+  r("clock", "bad", "rushed_after_gift", "Rushed after their mistake", "Your opponent slipped and you answered too fast to make the most of it."),
 
   // ---- Missed chances (rule) -------------------------------------------------
   r("missed", "bad", "missed_free_piece", "Missed a free piece", "Your opponent left a piece hanging and you didn't take it."),
@@ -103,6 +107,9 @@ export const TAGS: TagDef[] = [
   r("found", "good", "punished_mistake", "Punished their mistake", "Your opponent slipped and you made them pay."),
   r("found", "good", "sound_sacrifice", "Sound sacrifice", "You gave up material on purpose and it worked."),
   r("found", "good", "promoted", "Promoted a pawn", "You turned a pawn into a new queen."),
+  r("found", "good", "set_trap", "Sprang an opening trap", "Your opponent fell for a known opening trap and you punished it."),
+  r("found", "good", "delivered_back_rank_mate", "Back rank checkmate", "Checkmate on the back row, where the king had no escape square."),
+  r("found", "good", "delivered_smothered_mate", "Smothered checkmate", "A knight checkmate with the king boxed in by its own pieces."),
 
   // ---- Opening (rule) -----------------------------------------------------------
   r("opening", "bad", "early_queen", "Brought the queen out early", "You moved your queen out before your other pieces were ready."),
@@ -118,7 +125,6 @@ export const TAGS: TagDef[] = [
   r("opening", "good", "developed_piece", "Developed a piece", "You brought a new knight or bishop into the game."),
   r("opening", "neutral", "book_move", "Book move", "A standard opening move."),
   j("opening", "bad", "ignored_center", "Ignored the center", "The move did nothing for the center while the opponent took it.", { ask: { phases: O } }),
-  j("opening", "bad", "opening_trap_fell", "Fell for an opening trap", "The move falls for a known early trap.", { ask: { phases: O } }),
   j("opening", "bad", "blocked_own_pieces", "Blocked your own pieces", "The move gets in the way of your own bishop or pawns.", { ask: { phases: OM } }),
   j("opening", "bad", "premature_attack_opening", "Attacked before developing", "You started an attack before your pieces were out.", { ask: { phases: O } }),
 
@@ -182,14 +188,11 @@ export const TAGS: TagDef[] = [
   j("strategy", "bad", "premature_attack", "Attacked too early", "You attacked before your pieces were ready to support it.", { ask: { phases: M } }),
   j("strategy", "bad", "pawn_grab_greed", "Greedy pawn grab", "You went for a pawn and fell behind in development or safety."),
   j("strategy", "bad", "piece_misplaced", "Misplaced a piece", "You put a piece on a square where it does little.", { ask: { phases: ME } }),
-  j("strategy", "bad", "lost_initiative", "Gave up the initiative", "You were pressing and this move let your opponent take over.", { ask: { phases: ME } }),
   j("strategy", "bad", "wrong_plan", "Wrong plan", "The idea behind the move doesn't fit the position.", { ask: { phases: ME } }),
-  j("strategy", "bad", "ignored_opponent_plan", "Ignored the opponent's plan", "Your opponent was building something and you didn't stop it.", { ask: { phases: ME } }),
   j("strategy", "bad", "unnecessary_trade", "Unnecessary trade", "You traded off a good piece for no reason.", { ask: { phases: ME } }),
   j("strategy", "bad", "bad_bishop", "Locked in your own bishop", "Your pawns ended up on the same color as your bishop, blocking it.", { ask: { phases: ME } }),
   j("strategy", "bad", "rook_inactive", "Inactive rook", "Your rook stayed passive instead of taking an open line.", { ask: { phases: ME } }),
   j("strategy", "bad", "gave_up_center", "Gave up the center", "You let the opponent take control of the middle of the board.", { ask: { phases: OM } }),
-  j("strategy", "bad", "overcomplicated", "Overcomplicated", "There was a simple safe move and you chose a risky one."),
 
   // ---- Endgame (jev) ----------------------------------------------------------------
   j("endgame", "bad", "passive_king_endgame", "Passive king in the endgame", "In the endgame your king should come forward and fight; it stayed back.", { ask: { phases: E } }),
@@ -233,6 +236,95 @@ export function tagPlain(id: string): string {
 export function tagName(id: string): string {
   return TAG_BY_ID.get(id)?.label ?? id;
 }
+
+/**
+ * Yes/no criteria for Jev's judgment tags, taken from the knowledge base's
+ * definitions (section numbers in brackets) so Jev judges by the same rules
+ * Arthur teaches.
+ */
+export const JEV_CRITERIA: Record<string, string> = {
+  missed_overloaded_defender: "One enemy piece was the only defender of two or more things, and the player could have exploited it by attacking one of them [4.7].",
+  missed_removal_of_defender: "The player could have captured or chased away the piece guarding a key square or piece, winning what it guarded [4.11].",
+  missed_deflection: "The player could have forced a defending piece away from its duty, usually with a sacrifice or a threat it must answer [4.5].",
+  missed_zwischenzug: "Instead of the expected move (usually a recapture), a forcing in-between move (check, capture or threat) was available and stronger [4.9].",
+  missed_counterattack: "The player defended passively when a stronger counter threat or counter blow was available [7.16, 3.4].",
+  overloaded_own_defender: "One of the player's pieces was the only defender of two or more things, so it could not hold both [4.7].",
+  removed_own_defender: "The move took away a defender: the moved piece was guarding something that is now loose [3.5].",
+  allowed_deflection: "The opponent can lure one of the player's defenders away from its duty after this move [4.5].",
+  allowed_x_ray: "An enemy rook, bishop or queen now acts through one of the player's pieces onto something behind it [4.10].",
+  allowed_perpetual: "When ahead, the player let the opponent's pieces reach a series of checks the king cannot escape [4.16, 8.11].",
+  miscounted_exchange: "The player started a capture sequence on a square defended more times than attacked, or ignored the values of the pieces involved [3.6].",
+  aimless_move: "The move serves no plan: it doesn't improve a piece, target a weakness or prepare a pawn break [7.14].",
+  passive_retreat: "The player pulled back an active piece without being forced to, making it worse [7.13].",
+  premature_attack: "The player attacked with too few pieces, or before the opponent's counterplay and king safety were checked [7.15].",
+  pawn_grab_greed: "The player grabbed a pawn at the cost of development, king safety or the safety of the capturing piece [6.1 rule 6, 6.2].",
+  piece_misplaced: "The move puts a piece on a square where it has little scope or future [7.13].",
+  wrong_plan: "The idea behind the move does not fit the pawn structure or the imbalances of the position [7.14, 7.10].",
+  unnecessary_trade: "The player traded a good piece, or traded while behind or while attacking, against the rules for when to trade [7.17].",
+  bad_bishop: "The move fixes the player's pawns on the same colour as their own bishop, blocking it [7.9].",
+  rook_inactive: "A rook stays passive behind its pawns while an open or half open file is available [7.8].",
+  gave_up_center: "The move gives up central pawns or squares to the opponent without a concrete reason [6.1].",
+  passive_king_endgame: "With queens off, the player kept the king back instead of activating it [8.1].",
+  ignored_passed_pawn: "A passed pawn needed to be pushed (if the player's) or blockaded and stopped (if the opponent's), and the move did neither [8.1, 7.6].",
+  wrong_pawn_push: "In the endgame the player pushed a pawn too early or pushed the wrong pawn, against the king and pawn rules [8.2, 8.5].",
+  failed_conversion: "The player was winning the endgame and the move broke the step by step conversion method [8.11].",
+  rook_behind_wrong: "In a rook endgame the rook is not behind the passed pawn, against Tarrasch's rule [8.7.1].",
+  missed_simplification: "The player was ahead in material and could have traded pieces to reach an easy winning position [7.17].",
+  opposition_error: "In a king and pawn ending the player let the opponent take the opposition or a key square [8.2].",
+  didnt_check_threats: "The player did not ask what the opponent's last move attacked or threatened [2.7, 3.4].",
+  hope_chess: "The player made the move without checking whether the opponent had a check, capture or threat in reply that they couldn't meet [3.2].",
+  one_move_thinking: "The player looked at their own move but not at the opponent's best answer to it [3.2, 9.1].",
+  tunnel_vision: "The player focused on one area or idea and missed what was happening elsewhere on the board [3.4].",
+  impulsive: "The move was played quickly without the safety check before releasing it [3.7].",
+  didnt_scan_forcing_moves: "The player's checks, captures or threats (the CCT scan) included a much stronger move that was not played [3.3].",
+  assumed_forced_recapture: "The player recaptured automatically when an in-between move or a better capture existed [4.9].",
+  relaxed_when_winning: "The player was clearly winning and stopped doing the safety check, letting the advantage slip [3.7].",
+  panic_defense: "Under pressure the player chose a desperate or loosening move instead of calm defence [7.16, 10.3].",
+  trusted_opponent_threat: "The player reacted to a threat that wasn't real instead of continuing their plan [3.4].",
+  copied_pattern_wrongly: "The player played a familiar looking move or setup without checking it works in this position [6.3].",
+  ignored_center: "In the opening the move does nothing for the centre (e4, d4, e5, d5) while the opponent takes it [6.1].",
+  blocked_own_pieces: "The move blocks the player's own bishop or pieces, for example a pawn in front of a bishop [6.1].",
+  premature_attack_opening: "The player started an attack before developing their knights and bishops [6.1].",
+  neglected_king_safety: "The player left the king in the centre or exposed while doing something else [6.1, 7.16].",
+  weak_squares: "A pawn move left a hole: a square that can no longer be defended by a pawn, which enemy pieces can use [7.7].",
+  overextended_pawns: "Pawns were pushed so far they can't be supported and become targets [7.7].",
+  good_prophylaxis: "The move stops the opponent's next idea before it happens [7.12].",
+  improved_worst_piece: "With nothing tactical to do, the player improved their worst placed piece [7.13].",
+  good_defense: "Under pressure the player defended accurately: traded attackers, brought defenders, or countered in the centre [7.16].",
+  active_king_endgame: "With queens off, the player used the king actively [8.1].",
+  good_simplification: "Ahead in material, the player traded pieces (not pawns) toward an easy win [7.17].",
+  seized_open_file: "The player put a rook on an open or half open file [7.8].",
+  created_threat: "The move makes a real threat the opponent must answer [3.3].",
+};
+
+/** The knowledge base's six mistake categories (section 1.2, rule 1). */
+export const KB_CATEGORIES = [
+  { id: "hung_or_missed_threat", label: "Hung material or missed a threat", description: "Left material to be taken, or missed what the opponent's move threatened." },
+  { id: "missed_own_tactic", label: "Missed your own tactic", description: "A tactic or win was available for the player and they didn't see it." },
+  { id: "wrong_plan", label: "Wrong plan", description: "A strategic error: the move or plan doesn't fit the position, with no tactic involved." },
+  { id: "endgame_technique", label: "Endgame technique", description: "Went wrong in a simplified ending (king activity, pawns, rook endings, conversion)." },
+  { id: "opening_misunderstanding", label: "Opening misunderstanding", description: "Broke opening principles or fell for an opening trap." },
+  { id: "time_or_psychology", label: "Time or nerves", description: "The clock, rushing, relaxing or tilt caused the error more than the position did." },
+] as const;
+
+/** Principles from the knowledge base a mistake can break (Jev picks the main one). */
+export const PRINCIPLES = [
+  { id: "is_it_safe", label: "Is my piece safe after my move?", description: "Before every move, ask whether any piece can be taken for free afterwards [2.7, 3.3]." },
+  { id: "what_did_they_threaten", label: "What does their last move threaten?", description: "Look at what the opponent's last move attacks before moving [2.7, 3.4]." },
+  { id: "checks_captures_threats", label: "Checks, captures, threats first", description: "Scan all checks, captures and threats for both sides before choosing [3.3]." },
+  { id: "count_the_exchange", label: "Count attackers and defenders", description: "Before trading on a square, count attackers and defenders and their values [3.6]." },
+  { id: "check_their_reply", label: "Check their best reply", description: "For the chosen move, check the opponent's forcing replies (no hope chess) [3.2]." },
+  { id: "develop_first", label: "Develop before attacking", description: "Knights and bishops out, don't move pieces twice or bring the queen early [6.1]." },
+  { id: "castle_early", label: "Castle early", description: "Get the king safe behind pawns [6.1, 2.7]." },
+  { id: "careful_when_winning", label: "Stay careful when winning", description: "Keep doing the safety check until the game is over [3.7]." },
+  { id: "dont_rush", label: "Don't rush critical moments", description: "Spend time when the position is tense or a mistake would be costly [10.2, 3.7]." },
+  { id: "trade_rules", label: "Trade when ahead, avoid trades when behind", description: "The rules for when to trade [7.17]." },
+  { id: "king_safety", label: "Don't loosen your king", description: "Don't push pawns in front of your king or open lines to it without need [7.16]." },
+  { id: "use_your_king", label: "Use your king in the endgame", description: "Activate the king once queens are off [8.1, 2.7]." },
+  { id: "passed_pawns", label: "Push or stop passed pawns", description: "Passed pawns must be pushed; enemy ones must be blockaded [8.1, 7.6]." },
+  { id: "improve_worst_piece", label: "Improve your worst piece", description: "When nothing is happening, improve the worst placed piece [7.13]." },
+  { id: "avoid_stalemate", label: "Watch for stalemate", description: "When far ahead, check the opponent still has a legal move [2.4, 3.5]." },
+] as const;
 
 /** Why the move was played (one answer per move). */
 export const INTENTS = [

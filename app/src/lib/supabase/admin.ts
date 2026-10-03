@@ -12,10 +12,11 @@ let client: SupabaseClient | undefined;
  * the publishable key from reading anything.
  *
  * Awaiting connection() marks the caller as request-time, so pages that read
- * data are never prerendered at build time.
+ * data are never prerendered at build time. Maintenance scripts (scripts/*.mts)
+ * run outside Next, where there is no request; they set NIMZO_SCRIPT=1.
  */
 export async function db(): Promise<SupabaseClient> {
-  await connection();
+  if (process.env.NIMZO_SCRIPT !== "1") await connection();
   if (client) return client;
   const e = env();
   client = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.SUPABASE_SECRET_KEY, {

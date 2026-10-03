@@ -11,6 +11,7 @@ import { MOVE_LABELS, type LabelId } from "@/lib/analysis/labels";
 import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { ArthurPanel } from "@/components/coach/ArthurPanel";
+import { GameSummary } from "./GameSummary";
 import { expressionForGame, expressionForMove } from "@/lib/coach/expressions";
 
 export type ReviewPly = {
@@ -25,18 +26,27 @@ export type ReviewPly = {
   severity: Severity | null;
   label: LabelId | null;
   note: string | null; // Arthur's one plain sentence about this move
+  tags: { id: string; label: string; polarity: "good" | "bad" }[]; // what happened on this move (rule + Jev)
   bestUci: string | null; // engine's move in the position before this one
   whitePct: number | null;
 };
 
 /** v2 summaries have a headline, verdict and overview; older ones a key moment. */
 export type ReviewSummary = {
+  version?: number;
   headline?: string;
   verdict?: "excellent" | "good" | "mixed" | "rough";
+  // v3: structured
+  story?: string[];
+  momentum?: string;
+  fell_short?: string[];
+  went_well?: string | string[];
+  conclusion?: string;
+  knowledge_used?: string[];
+  // v1/v2
   overview?: string;
   key_moment?: string;
-  went_well: string;
-  work_on: string;
+  work_on?: string;
 };
 
 export type CoachInfo = {
@@ -211,7 +221,9 @@ export function GameReview({ data }: { data: ReviewData }) {
           opening={
             data.summary
               ? {
-                  text: data.summary.overview
+                  text: data.summary.story
+                    ? `${data.summary.headline}. ${data.summary.momentum ?? ""}`.trim()
+                    : data.summary.overview
                     ? `${data.summary.headline ? `${data.summary.headline}. ` : ""}${data.summary.overview} ${data.summary.work_on}`
                     : `${data.summary.key_moment ?? ""} ${data.summary.work_on}`.trim(),
                   expression: expressionForGame(data.result, data.accuracy, data.summary.verdict),
@@ -222,6 +234,8 @@ export function GameReview({ data }: { data: ReviewData }) {
             pos && (pos.note || (pos.severity && selectedCoach?.explanation))
               ? {
                   text: pos.note ?? selectedCoach!.explanation!,
+                  ply: pos.ply,
+                  tags: pos.isMine ? pos.tags : [],
                   expression: expressionForMove({
                     label: pos.label,
                     mine: pos.isMine,
@@ -242,6 +256,8 @@ export function GameReview({ data }: { data: ReviewData }) {
                 : "I'm writing up my notes on this game."
           }
         />
+
+        {data.summary && <GameSummary summary={data.summary} />}
 
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
@@ -401,15 +417,6 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
           <span className="inline-block h-1.5 w-6 rounded-full bg-[rgba(76,140,60,0.85)]" aria-hidden="true" />
           The green arrow shows the move the engine wanted instead.
         </p>
-      )}
-      {info && info.tags.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-2" aria-label="What happened">
-          {info.tags.map((t) => (
-            <li key={t.id} className="chip font-normal" title={t.confidence !== null ? `Jev is ${Math.round(t.confidence * 100)}% sure` : "Confirmed by board analysis"}>
-              {t.label}
-            </li>
-          ))}
-        </ul>
       )}
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-line-soft pt-3 text-sm text-body2">
         {info?.maiaLine && (
