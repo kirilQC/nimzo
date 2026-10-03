@@ -1,4 +1,5 @@
 import type { ReviewSummary } from "./GameReview";
+import { MoveText } from "./MoveText";
 
 const VERDICT: Record<string, { label: string; className: string }> = {
   excellent: { label: "Excellent game", className: "bg-[#e3efd6] text-[#3d6b22]" },
@@ -8,7 +9,7 @@ const VERDICT: Record<string, { label: string; className: string }> = {
 };
 
 /** Arthur's game summary in a fixed shape: story, how the advantage moved, where you fell short, what went well, the one lesson. */
-export function GameSummary({ summary }: { summary: ReviewSummary }) {
+export function GameSummary({ summary, onJump }: { summary: ReviewSummary; onJump?: (moveNumber: number) => void }) {
   const wentWell = Array.isArray(summary.went_well) ? summary.went_well : summary.went_well ? [summary.went_well] : [];
   const v = summary.verdict ? VERDICT[summary.verdict] : undefined;
 
@@ -36,13 +37,15 @@ export function GameSummary({ summary }: { summary: ReviewSummary }) {
       </div>
       <div className="mt-3 space-y-3 text-[0.9875rem] leading-relaxed text-body2">
         {summary.story.map((p, i) => (
-          <p key={i}>{p}</p>
+          <p key={i}>
+            <MoveText text={p} onJump={onJump} />
+          </p>
         ))}
       </div>
       {summary.momentum && (
         <p className="mt-4 rounded-[8px] bg-parchment px-3 py-2 text-sm text-ink">
           <span className="font-semibold">How the game went: </span>
-          {summary.momentum}
+          <MoveText text={summary.momentum} onJump={onJump} />
         </p>
       )}
       {!!summary.fell_short?.length && (
@@ -50,7 +53,9 @@ export function GameSummary({ summary }: { summary: ReviewSummary }) {
           <h3 className="eyebrow mb-1.5">Where you fell short</h3>
           <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-[color:var(--blunder-bg)]">
             {summary.fell_short.map((b, i) => (
-              <li key={i}>{b}</li>
+              <li key={i}>
+                <MoveText text={b} onJump={onJump} />
+              </li>
             ))}
           </ul>
         </div>
@@ -60,12 +65,18 @@ export function GameSummary({ summary }: { summary: ReviewSummary }) {
           <h3 className="eyebrow mb-1.5">What went well</h3>
           <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-[#4e7a3a]">
             {wentWell.map((b, i) => (
-              <li key={i}>{b}</li>
+              <li key={i}>
+                <MoveText text={b} onJump={onJump} />
+              </li>
             ))}
           </ul>
         </div>
       )}
-      {summary.conclusion && <p className="mt-4 border-t border-line-soft pt-3 font-semibold text-ink">{summary.conclusion}</p>}
+      {summary.conclusion && (
+        <p className="mt-4 border-t border-line-soft pt-3 font-semibold text-ink">
+          <MoveText text={summary.conclusion} onJump={onJump} />
+        </p>
+      )}
     </section>
   );
 }

@@ -23,7 +23,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/games/[id]/
     await logError("analysis.browser", new Error(parsed.data.error), {}, id);
     await db.from(T.games).update({ analysis_status: "failed", analysis_error: parsed.data.error }).eq("id", id);
   } else if (parsed.data.action === "reanalyze") {
-    for (const table of [T.mistakes, T.game_reviews, T.positions]) {
+    for (const table of [T.mistakes, T.game_reviews, T.positions, T.game_analysis]) {
       const r = await db.from(table).delete().eq("game_id", id);
       if (r.error) return NextResponse.json({ error: r.error.message }, { status: 500 });
     }

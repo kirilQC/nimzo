@@ -28,8 +28,9 @@ export async function explainTag(gameId: string, ply: number, tag: string): Prom
     .select("features, tags, note, intent, root_cause, tag_explanations")
     .eq("game_id", gameId)
     .eq("ply", ply)
-    .single();
-  if (error || !row) throw new Error("move not found");
+    .maybeSingle();
+  if (error) throw new Error(`load move: ${error.message}`);
+  if (!row) throw new Error("move not found");
   const cached = (row.tag_explanations as Record<string, TagExplanation> | null)?.[tag];
   if (cached) return cached;
 

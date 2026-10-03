@@ -13,6 +13,7 @@ import { notationIn } from "./guard";
 import { plainMove } from "./plain";
 import { momentum } from "./momentum";
 import { bannedIn, longSentences, noDashes } from "./text";
+import { saveGameAnalysis } from "@/lib/analysis/gameRow";
 
 const reviewSchema = z.object({
   headline: z.string(),
@@ -166,5 +167,6 @@ export async function runReviewStep(gameId: string): Promise<{ notes: number; mo
   const { error: revErr } = await db.from(T.game_reviews).upsert({ game_id: gameId, summary, model }, { onConflict: "game_id" });
   if (revErr) throw new Error(`save summary: ${revErr.message}`);
   await db.from(T.games).update({ analysis_status: "reviewed", analysis_updated_at: new Date().toISOString() }).eq("id", gameId);
+  await saveGameAnalysis(gameId).catch((e) => logError("analysis.row", e, {}, gameId));
   return { notes: noteByPly.size, model };
 }

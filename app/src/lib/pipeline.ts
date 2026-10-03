@@ -9,6 +9,7 @@ import { jevClassify, JEV_MIN_PROBABILITY, type JevResult } from "@/lib/tags/jev
 import { TAG_BY_ID } from "@/lib/tags/catalog";
 import type { MaiaFact } from "@/lib/tags/factsheet";
 import { logError } from "@/lib/log";
+import { saveGameAnalysis } from "@/lib/analysis/gameRow";
 
 /**
  * Server steps of the resumable analysis state machine:
@@ -195,6 +196,7 @@ export async function runTagStep(gameId: string): Promise<{ tagged: number; fail
   };
   await Promise.all(Array.from({ length: 8 }, worker));
   await db.from(T.games).update({ analysis_status: "tagged", analysis_updated_at: new Date().toISOString() }).eq("id", gameId);
+  await saveGameAnalysis(gameId).catch((e) => logError("analysis.row", e, {}, gameId));
   return { tagged: (rows ?? []).length, failed, cost };
 }
 

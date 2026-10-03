@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { COACH } from "@/lib/coach/persona";
 import { EXPRESSIONS, expressionSrc, type Expression } from "@/lib/coach/expressions";
+import { MoveText } from "@/components/review/MoveText";
 
 export type MoveTag = { id: string; label: string; polarity: "good" | "bad" };
 export type ArthurSay = { text: string; expression: Expression; ply?: number; tags?: MoveTag[] };
@@ -24,12 +25,14 @@ export function ArthurPanel({
   focus,
   ply,
   placeholder,
+  onJump,
 }: {
   gameId: string | null;
   opening: ArthurSay | null; // first thing Arthur says (game summary)
   focus: ArthurSay | null; // explanation of the flagged move you're looking at
   ply: number;
   placeholder: string;
+  onJump?: (moveNumber: number) => void; // "move 18" in Arthur's text jumps the board there
 }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [question, setQuestion] = useState("");
@@ -184,7 +187,7 @@ export function ArthurPanel({
             {asking && <span className="text-sm text-muted">thinking…</span>}
           </div>
           <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
-            {bubble ?? placeholder}
+            {bubble ? <MoveText text={bubble} onJump={onJump} /> : placeholder}
           </p>
           {moveTags.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="What happened on this move. Click a tag for Arthur's explanation.">
@@ -228,7 +231,9 @@ export function ArthurPanel({
                 <span className="text-muted">Arthur is thinking about why…</span>
               ) : openExplanation ? (
                 <>
-                  <p>{openExplanation.text}</p>
+                  <p>
+                    <MoveText text={openExplanation.text} onJump={onJump} />
+                  </p>
                   {openExplanation.learn && <p className="mt-1.5 text-xs text-muted">From the lesson: {openExplanation.learn.title}</p>}
                 </>
               ) : null}
@@ -243,7 +248,7 @@ export function ArthurPanel({
           {lines.filter((l) => !(l.who === "arthur" && l.text === bubble)).map((l, i) => (
             <li key={i} className={`text-sm ${l.who === "you" ? "text-right" : ""}`}>
               <span className={`inline-block max-w-[90%] rounded-[8px] px-3 py-1.5 text-left ${l.who === "you" ? "bg-chip text-ink" : "bg-parchment text-body2"}`}>
-                {l.text}
+                {l.who === "arthur" ? <MoveText text={l.text} onJump={onJump} /> : l.text}
               </span>
             </li>
           ))}

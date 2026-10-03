@@ -95,6 +95,7 @@ export function GameReview({ data }: { data: ReviewData }) {
   // With a summary, start at the beginning so Arthur greets you first; Next mistake walks the flagged moves.
   const [current, setCurrent] = useState<number>(data.summary ? 0 : (firstFlag ?? 0));
   const listRef = useRef<HTMLOListElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const go = useCallback(
     (ply: number) => {
@@ -110,6 +111,17 @@ export function GameReview({ data }: { data: ReviewData }) {
       }
     },
     [plies.length],
+  );
+
+  /** "Move 18" in Arthur's text means your 18th move: show it on the board and bring the board into view. */
+  const jumpToMove = useCallback(
+    (moveNumber: number) => {
+      const ply = myColor === "white" ? moveNumber * 2 - 1 : moveNumber * 2;
+      go(ply);
+      boardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      boardRef.current?.focus({ preventScroll: true });
+    },
+    [go, myColor],
   );
 
   const flagged = useMemo(() => plies.filter((p) => p.isMine && p.severity).map((p) => p.ply), [plies]);
@@ -158,6 +170,7 @@ export function GameReview({ data }: { data: ReviewData }) {
       {/* Board column */}
       <div className="min-w-0 space-y-4">
         <div
+          ref={boardRef}
           tabIndex={0}
           onKeyDown={onBoardKey}
           aria-label="Game board. Use the arrow keys to step through the game."
@@ -217,6 +230,7 @@ export function GameReview({ data }: { data: ReviewData }) {
       {/* Coach, ask and moves column */}
       <div className="min-w-0 space-y-4">
         <ArthurPanel
+          onJump={jumpToMove}
           gameId={data.gameId}
           opening={
             data.summary
@@ -257,7 +271,7 @@ export function GameReview({ data }: { data: ReviewData }) {
           }
         />
 
-        {data.summary && <GameSummary summary={data.summary} />}
+        {data.summary && <GameSummary summary={data.summary} onJump={jumpToMove} />}
 
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
