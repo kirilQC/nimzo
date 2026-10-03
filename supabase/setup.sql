@@ -40,7 +40,7 @@ create table public.nimzo_settings (
   chesscom_username text,
   ratings jsonb not null default '{}'::jsonb,          -- snapshot from /stats per time class
   ratings_fetched_at timestamptz,
-  thresholds jsonb not null default '{"inaccuracy":0.1,"mistake":0.2,"blunder":0.3,"jev_min_confidence":0.6,"engine_depth":16}'::jsonb,
+  thresholds jsonb not null default '{"inaccuracy":0.16,"mistake":0.24,"blunder":0.6,"jev_min_confidence":0.6,"engine_depth":16}'::jsonb,
   session_auto_off_minutes int not null default 60,
   maia_default_elo int,
   backfill_months int not null default 3,

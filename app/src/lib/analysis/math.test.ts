@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatScore, gameAccuracy, judgeMove, moveAccuracy, scoreToCp, whiteWinPct, winPct } from "./math";
+import { ACCURACY_FIT, formatScore, gameAccuracy, judgeMove, moveAccuracy, scoreToCp, whiteWinPct, winPct } from "./math";
 import { parseBestMove, parseInfo, toWhitePerspective } from "./uci";
 
 describe("winPct (Lichess)", () => {
@@ -19,34 +19,39 @@ describe("winPct (Lichess)", () => {
   });
 });
 
-describe("moveAccuracy (Lichess)", () => {
+describe("moveAccuracy (fitted to chess.com)", () => {
   it("is ~100 for no loss and falls with the win% drop", () => {
     expect(moveAccuracy(60, 60)).toBeCloseTo(99.9999, 3);
     expect(moveAccuracy(60, 70)).toBe(100); // improving is clamped
-    expect(moveAccuracy(60, 50)).toBeCloseTo(103.1668 * Math.exp(-0.4354) - 3.1669, 6);
+    expect(moveAccuracy(60, 50)).toBeCloseTo(103.1668 * Math.exp(-ACCURACY_FIT.b * 10) - 3.1669, 6);
     expect(moveAccuracy(90, 0)).toBe(0);
   });
-  it("averages over moves", () => {
-    expect(gameAccuracy([100, 50])).toBe(75);
+  it("power-averages over moves, so bad moves weigh more than in a plain mean", () => {
+    expect(gameAccuracy([100, 100])).toBeCloseTo(100, 6);
+    const g = gameAccuracy([100, 50])!;
+    expect(g).toBeLessThan(75);
+    expect(g).toBeGreaterThan(50);
     expect(gameAccuracy([])).toBeNull();
   });
 });
 
 describe("judgeMove thresholds", () => {
   // White to move at +0 (50%). Drops measured in winning chances: 0.1 = 5 points.
+  // Thresholds 8 / 12 / 30 points ≈ 0.9 / 1.3 / 3.8 pawns from equality.
   const judge = (afterCp: number, playedBest = false) =>
     judgeMove({ before: { cp: 0 }, after: { cp: afterCp }, mover: "w", playedBest, deliversMate: false });
 
   it("classifies by drop size", () => {
     expect(judge(-10).classification).toBe("good");
     expect(judge(0, true).classification).toBe("best");
-    expect(judge(-60).classification).toBe("inaccuracy"); // ~5.5 points
-    expect(judge(-120).classification).toBe("mistake"); // ~10.8 points
-    expect(judge(-180).classification).toBe("blunder"); // ~15.6 points
+    expect(judge(-60).classification).toBe("good"); // ~5.5 points
+    expect(judge(-100).classification).toBe("inaccuracy"); // ~9.1 points
+    expect(judge(-200).classification).toBe("mistake"); // ~17.5 points
+    expect(judge(-400).classification).toBe("blunder"); // ~31.5 points
   });
 
   it("measures from the mover's side when Black moves", () => {
-    const j = judgeMove({ before: { cp: 0 }, after: { cp: 200 }, mover: "b", playedBest: false, deliversMate: false });
+    const j = judgeMove({ before: { cp: 0 }, after: { cp: 400 }, mover: "b", playedBest: false, deliversMate: false });
     expect(j.classification).toBe("blunder");
     expect(j.winBefore).toBe(50);
   });

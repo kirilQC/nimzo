@@ -1,6 +1,8 @@
 /**
  * Evaluation math shared by the browser engine pass, the server and Practice mode.
- * Formulas follow Lichess (lila: WinPercent, AccuracyPercent, Advice).
+ * The win% curve is Lichess's; the label thresholds and the accuracy formula are
+ * fitted to chess.com Game Review on 35 of the player's games (calibration/fit2.mjs,
+ * checked on held-out games), so Nimzo's numbers read like chess.com's.
  */
 
 /** An engine score from WHITE's perspective. `mate` > 0 means White mates in N. */
@@ -9,8 +11,11 @@ export type Score = { cp: number; mate?: undefined } | { mate: number; cp?: unde
 export type Classification = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
 export type Severity = Exclude<Classification, "best" | "good">;
 
-/** Drops on the "winning chances" scale (−1…+1); 0.1 = 5 win-percentage points. */
-export const THRESHOLDS = { inaccuracy: 0.1, mistake: 0.2, blunder: 0.3 } as const;
+/**
+ * Drops on the "winning chances" scale (−1…+1); 0.1 = 5 win-percentage points.
+ * Fitted to chess.com (Lichess uses 0.1 / 0.2 / 0.3, which flags far more moves).
+ */
+export const THRESHOLDS = { inaccuracy: 0.16, mistake: 0.24, blunder: 0.6 } as const;
 export type Thresholds = { inaccuracy: number; mistake: number; blunder: number };
 
 export const CP_CLAMP = 1000;
@@ -39,16 +44,32 @@ export function sideWinPct(score: Score, side: "w" | "b"): number {
   return side === "w" ? w : 100 - w;
 }
 
-/** Lichess per-move accuracy from the mover's win% before and after, clamped 0–100. */
+/**
+ * Accuracy uses a flatter win curve and a steeper per-move penalty than Lichess,
+ * then a power mean that lets a few bad moves pull the game score down — the
+ * combination that matched chess.com's game accuracy best (about 5 points off on
+ * held-out games, versus 17 for a plain Lichess mean).
+ */
+export const ACCURACY_FIT = { k: 0.0015, b: 0.15, q: 0.25 } as const;
+
+/** Win% on the accuracy curve, from one side's perspective. */
+export function accuracyWinPct(score: Score, side: "w" | "b"): number {
+  const w = 50 + 50 * (2 / (1 + Math.exp(-ACCURACY_FIT.k * scoreToCp(score))) - 1);
+  return side === "w" ? w : 100 - w;
+}
+
+/** Per-move accuracy (0–100) from the mover's accuracy-curve win% before and after. */
 export function moveAccuracy(winBefore: number, winAfter: number): number {
-  const acc = 103.1668 * Math.exp(-0.04354 * (winBefore - winAfter)) - 3.1669;
+  const acc = 103.1668 * Math.exp(-ACCURACY_FIT.b * (winBefore - winAfter)) - 3.1669;
   return Math.max(0, Math.min(100, acc));
 }
 
-/** Mean of per-move accuracies (null if no moves). */
+/** Power mean of per-move accuracies (null if no moves). */
 export function gameAccuracy(accs: number[]): number | null {
   if (!accs.length) return null;
-  return accs.reduce((a, b) => a + b, 0) / accs.length;
+  const q = ACCURACY_FIT.q;
+  const m = accs.reduce((sum, a) => sum + Math.pow(Math.max(a, 1), q), 0) / accs.length;
+  return Math.pow(m, 1 / q);
 }
 
 export type MoveJudgement = {
@@ -77,6 +98,10 @@ export function judgeMove(args: {
   const winBefore = sideWinPct(args.before, args.mover);
   const winAfter = args.deliversMate ? 100 : sideWinPct(args.after, args.mover);
   const drop = Math.max(0, (winBefore - winAfter) / 50);
+  const accuracy = moveAccuracy(
+    accuracyWinPct(args.before, args.mover),
+    args.deliversMate ? 100 : accuracyWinPct(args.after, args.mover),
+  );
 
   const moverMateBefore = mateFor(args.before, args.mover);
   const moverMateAfter = mateFor(args.after, args.mover);
@@ -88,7 +113,7 @@ export function judgeMove(args: {
   else if (drop >= t.inaccuracy) classification = "inaccuracy";
   else classification = args.playedBest ? "best" : "good";
 
-  return { winBefore, winAfter, drop, accuracy: moveAccuracy(winBefore, winAfter), classification, missedMate };
+  return { winBefore, winAfter, drop, accuracy, classification, missedMate };
 }
 
 /** Mate-in-N from `side`'s perspective (positive = side mates), or null if no mate score. */

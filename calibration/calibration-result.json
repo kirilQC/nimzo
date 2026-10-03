@@ -1,0 +1,110 @@
+{
+  "games": 35,
+  "train": 18,
+  "test": 17,
+  "labels": {
+    "nimzo_current_lichess": {
+      "params": {
+        "k": 0.00368208,
+        "inaccuracy": 0.05,
+        "mistake": 0.1,
+        "blunder": 0.15,
+        "miss": false
+      },
+      "train_agreement": 0.7372802960222017,
+      "test_agreement": 0.7470198675496689,
+      "test_moves": 755,
+      "test_count_error_per_side": 6.294117647058823,
+      "test_error_precision": 0.8082191780821918,
+      "test_error_recall": 0.7866666666666666,
+      "test_confusion": {
+        "ok->ok": 488,
+        "ok->inaccuracy": 38,
+        "blunder->blunder": 35,
+        "incorrect->blunder": 24,
+        "mistake->blunder": 37,
+        "incorrect->mistake": 6,
+        "inaccuracy->mistake": 20,
+        "inaccuracy->blunder": 3,
+        "inaccuracy->ok": 16,
+        "mistake->ok": 22,
+        "incorrect->ok": 10,
+        "inaccuracy->inaccuracy": 33,
+        "mistake->mistake": 8,
+        "ok->mistake": 3,
+        "ok->blunder": 1,
+        "mistake->inaccuracy": 9,
+        "incorrect->inaccuracy": 2
+      }
+    },
+    "fitted": {
+      "params": {
+        "k": 0.0035,
+        "inaccuracy": 0.08,
+        "mistake": 0.12,
+        "blunder": 0.3,
+        "miss": true,
+        "missGift": 0.1,
+        "missWinFloor": 40
+      },
+      "train_agreement": 0.816836262719704,
+      "test_agreement": 0.8172185430463577,
+      "test_moves": 755,
+      "test_count_error_per_side": 3.9705882352941178,
+      "test_error_precision": 0.9493670886075949,
+      "test_error_recall": 0.6666666666666666,
+      "test_confusion": {
+        "ok->ok": 522,
+        "blunder->blunder": 17,
+        "incorrect->incorrect": 20,
+        "mistake->mistake": 30,
+        "incorrect->inaccuracy": 7,
+        "inaccuracy->mistake": 8,
+        "blunder->mistake": 6,
+        "inaccuracy->ok": 35,
+        "mistake->ok": 29,
+        "incorrect->ok": 11,
+        "mistake->incorrect": 12,
+        "inaccuracy->inaccuracy": 28,
+        "ok->mistake": 3,
+        "ok->incorrect": 1,
+        "incorrect->blunder": 4,
+        "blunder->incorrect": 12,
+        "mistake->inaccuracy": 4,
+        "ok->inaccuracy": 4,
+        "inaccuracy->incorrect": 1,
+        "mistake->blunder": 1
+      }
+    }
+  },
+  "accuracy": {
+    "nimzo_current_plain_mean": {
+      "params": {
+        "k": 0.00368208,
+        "b": 0.04354,
+        "mode": "mean"
+      },
+      "train_mae": 22.15448280070407,
+      "test_mae": 16.80345267430082
+    },
+    "lichess_full": {
+      "params": {
+        "k": 0.00368208,
+        "b": 0.04354,
+        "mode": "lichess"
+      },
+      "train_mae": 9.653474713512406,
+      "test_mae": 9.769054501007574
+    },
+    "fitted": {
+      "params": {
+        "k": 0.0015,
+        "b": 0.15,
+        "mode": "power",
+        "q": 0.25
+      },
+      "train_mae": 7.342962902156925,
+      "test_mae": 4.6149482420766885
+    }
+  }
+}
