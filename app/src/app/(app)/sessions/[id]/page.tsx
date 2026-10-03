@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { flagsSummary } from "@/components/ui";
 import { ClockBuckets } from "@/components/sessions/ClockBuckets";
 import { SummaryWriter } from "@/components/sessions/SummaryWriter";
-import { ArthurSays } from "@/components/coach/SpokenText";
+import { CoachAvatar } from "@/components/coach/CoachAvatar";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { formatDate } from "@/lib/format";
@@ -100,7 +100,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
         <section className="card-dark flex flex-col p-6" aria-labelledby="takeaway-h">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <ArthurSays size={56} text={summary.takeaway ?? null} onceKey={summary.takeaway && id !== "sample" ? `session-${id}` : null} />
+              <CoachAvatar size={56} />
               <h2 id="takeaway-h" className="eyebrow">
                 Coach&apos;s takeaway
               </h2>

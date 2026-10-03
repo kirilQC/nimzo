@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useVoice } from "./VoiceProvider";
 import { COACH } from "@/lib/coach/persona";
 import { EXPRESSIONS, expressionSrc, type Expression } from "@/lib/coach/expressions";
 
 export type ArthurSay = { text: string; expression: Expression };
 type Line = { who: "arthur" | "you"; text: string; expression?: Expression };
 
-const SETTLE_MS = 8_000; // back to a warm smile after talking
+const SETTLE_MS = 12_000; // back to a warm smile after reacting
 const SLEEPY_MS = 4 * 60_000; // nods off if you've been away a while
 
 /**
  * Arthur's corner of the review page: his portrait (whose expression follows
  * the moment), what he's saying now, and the back-and-forth. He opens with the
  * game summary, explains each flagged move as you step to it, and answers
- * questions about the game out loud.
+ * questions about the game.
  */
 export function ArthurPanel({
   gameId,
@@ -30,7 +29,6 @@ export function ArthurPanel({
   ply: number;
   placeholder: string;
 }) {
-  const { speak, speaking, current, muted } = useVoice();
   const [lines, setLines] = useState<Line[]>([]);
   const [question, setQuestion] = useState("");
   const [typing, setTyping] = useState(false);
@@ -38,17 +36,18 @@ export function ArthurPanel({
   const [error, setError] = useState<string | null>(null);
   const [face, setFace] = useState<Expression>(opening ? "cap_tip" : "warm_smile");
   const [activity, setActivity] = useState(0);
+  const [current, setCurrent] = useState<string | null>(null); // the line on show
   const said = useRef(new Set<string>());
   const threadRef = useRef<HTMLOListElement>(null);
 
-  const say = (s: ArthurSay, interrupt: boolean) => {
+  const say = (s: ArthurSay) => {
     if (!said.current.has(s.text)) {
       said.current.add(s.text);
       setLines((l) => [...l, { who: "arthur", text: s.text, expression: s.expression }]);
     }
+    setCurrent(s.text);
     setFace(s.expression);
     setActivity((n) => n + 1);
-    speak(s.text, { interrupt });
   };
 
   // Preload every expression so switching never flickers.
@@ -59,31 +58,31 @@ export function ArthurPanel({
     }
   }, []);
 
-  // Arthur reacting to what's on screen is a side effect (speech + face), so it lives in effects.
+  // Arthur reacting to what's on screen (new line + face) is a side effect of navigation, so it lives in effects.
   /* eslint-disable react-hooks/set-state-in-effect */
-  // Opening: the game summary, once (interrupting whatever was said on the previous page).
+  // Opening: the game summary, once.
   useEffect(() => {
-    if (opening) say(opening, true);
+    if (opening) say(opening);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opening?.text]);
 
   // Stepping onto a flagged move: Arthur reacts and explains it.
   useEffect(() => {
-    if (focus) say(focus, true);
+    if (focus) say(focus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.text]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Settle back to a smile when the talking stops; nod off if nothing happens for a while.
+  // Settle back to a smile after a while; nod off if nothing happens for a long while.
   useEffect(() => {
-    if (speaking || asking || typing) return;
+    if (asking || typing) return;
     const settle = setTimeout(() => setFace("warm_smile"), SETTLE_MS);
     const sleepy = setTimeout(() => setFace("sleepy"), SLEEPY_MS);
     return () => {
       clearTimeout(settle);
       clearTimeout(sleepy);
     };
-  }, [speaking, asking, typing, activity]);
+  }, [asking, typing, activity]);
 
   useEffect(() => {
     const el = threadRef.current; // scroll the conversation box only, never the page
@@ -107,7 +106,7 @@ export function ArthurPanel({
       });
       const json = (await res.json().catch(() => ({}))) as { answer?: string; expression?: Expression; error?: string };
       if (!res.ok || !json.answer) throw new Error(json.error ?? "Arthur couldn't answer that just now.");
-      say({ text: json.answer, expression: json.expression && json.expression in EXPRESSIONS ? json.expression : "explaining" }, true);
+      say({ text: json.answer, expression: json.expression && json.expression in EXPRESSIONS ? json.expression : "explaining" });
     } catch (err) {
       setError((err as Error).message);
       setFace("shrug");
@@ -117,8 +116,8 @@ export function ArthurPanel({
   }
 
   const arthurLines = lines.filter((l) => l.who === "arthur");
-  const speakingLine = current ? arthurLines.find((l) => l.text === current) : undefined;
-  const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : (speakingLine?.expression ?? face);
+  const currentLine = current ? arthurLines.find((l) => l.text === current) : undefined;
+  const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : face;
 
   return (
     <section className="card p-0" aria-labelledby="arthur-h">
@@ -139,14 +138,10 @@ export function ArthurPanel({
             <h2 id="arthur-h" className="text-xl">
               {COACH.name}
             </h2>
-            {asking ? (
-              <span className="text-sm text-muted">thinking…</span>
-            ) : muted ? (
-              <span className="text-sm text-muted">muted</span>
-            ) : null}
+            {asking && <span className="text-sm text-muted">thinking…</span>}
           </div>
           <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
-            {speakingLine?.text ?? arthurLines.at(-1)?.text ?? placeholder}
+            {currentLine?.text ?? arthurLines.at(-1)?.text ?? placeholder}
           </p>
         </div>
       </div>

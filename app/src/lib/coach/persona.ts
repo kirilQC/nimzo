@@ -1,4 +1,4 @@
-/** The coach character. His voice is the browser's built-in speech (VoiceProvider). */
+/** The coach character. */
 export const COACH = {
   name: "Arthur",
 } as const;

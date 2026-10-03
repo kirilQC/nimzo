@@ -26,7 +26,7 @@ export type MoveFacts = {
   fen_before: string;
   fen_after: string;
   phase: "opening" | "middlegame" | "endgame";
-  classification: "inaccuracy" | "mistake" | "blunder";
+  classification: "inaccuracy" | "mistake" | "miss" | "blunder";
   eval_before: string | null; // White's perspective, e.g. "+0.6"
   eval_after: string | null;
   win_pct_before: number; // mover's perspective

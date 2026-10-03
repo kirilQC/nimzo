@@ -21,8 +21,16 @@ export type GameRow = {
   eco: string | null;
   opening_name: string | null;
   accuracy_chesscom: number | null;
+  move_count: number;
   session_id: string | null;
 };
+
+/** Full moves played (1. e4 e5 is one move; a game ending on White's move rounds up). */
+export function moveCount(pgn: string): number {
+  const c = new Chess();
+  c.loadPgn(pgn);
+  return Math.ceil(c.history().length / 2);
+}
 
 export function dedupeKey(g: { uuid?: string | null; url: string }): string {
   return g.uuid ? `uuid:${g.uuid}` : `url:${g.url}`;
@@ -75,8 +83,9 @@ export function mapGame(raw: unknown, username: string, activeSession: { id: str
   const color = myColor(g, username);
   if (!color) return { skip: "not my game" };
 
+  let moves: number;
   try {
-    new Chess().loadPgn(g.pgn);
+    moves = moveCount(g.pgn);
   } catch (e) {
     return { skip: `unparseable pgn: ${(e as Error).message}` };
   }
@@ -106,6 +115,7 @@ export function mapGame(raw: unknown, username: string, activeSession: { id: str
       eco: pgnHeader(g.pgn, "ECO"),
       opening_name: openingNameFromUrl(g.eco ?? pgnHeader(g.pgn, "ECOUrl")),
       accuracy_chesscom: g.accuracies?.[color] ?? null,
+      move_count: moves,
       session_id: inSession ? activeSession.id : null,
     },
   };

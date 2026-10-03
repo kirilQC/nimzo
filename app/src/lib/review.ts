@@ -2,7 +2,8 @@ import "server-only";
 import type { CoachInfo, ReviewData, ReviewPly } from "@/components/review/GameReview";
 import { pgnToPositions } from "@/lib/chess/pgn";
 import { formatLine } from "@/lib/chess/lines";
-import { formatScore, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
+import { formatScore, gameAccuracy, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
+import { MOVE_LABELS, isLabelId, type LabelId } from "@/lib/analysis/labels";
 import { DIMENSIONS, motifLabel, tagLabel } from "@/lib/taxonomy";
 
 export type MistakeRecord = {
@@ -49,6 +50,7 @@ export type PositionRecord = {
   eval_mate: number | null;
   win_pct: number | string | null;
   classification: string | null;
+  accuracy?: number | string | null;
   best_move_san: string | null;
   pv_san: string[] | null;
   multipv: { score: Score; pv_san: string[] }[] | null;
@@ -94,6 +96,7 @@ export function buildReviewData(args: {
       clockMs: p.clockMs,
       isMine: p.color === mine,
       severity: isSeverity(row?.classification) ? row.classification : null,
+      label: isLabelId(row?.classification) ? row.classification : null,
       whitePct: row?.win_pct !== null && row?.win_pct !== undefined ? Number(row.win_pct) : null,
     };
   });
@@ -129,8 +132,21 @@ export function buildReviewData(args: {
     }
   }
 
+  // chess.com-style tally of every label, for both players, and the opponent's accuracy.
+  const empty = () => Object.fromEntries(MOVE_LABELS.map((l) => [l.id, 0])) as Record<LabelId, number>;
+  const counts = { me: empty(), opponent: empty() };
+  const oppAccs: number[] = [];
+  for (const p of plies) {
+    if (p.label) counts[p.isMine ? "me" : "opponent"][p.label]++;
+    const acc = byPly.get(p.ply)?.accuracy;
+    if (!p.isMine && acc !== null && acc !== undefined) oppAccs.push(Number(acc));
+  }
+  const opp = analyzed ? gameAccuracy(oppAccs) : null;
+
   return {
     gameId: args.gameId,
+    counts: analyzed ? counts : null,
+    accuracyOpponent: opp === null ? null : Math.round(opp * 10) / 10,
     status: args.status,
     error: args.error,
     startFen: parsed.startFen,

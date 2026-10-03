@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 
-export type Severity = "blunder" | "mistake" | "inaccuracy";
+export type Severity = "blunder" | "miss" | "mistake" | "inaccuracy";
 
-const SEVERITY_LABEL: Record<Severity, string> = { blunder: "Blunder", mistake: "Mistake", inaccuracy: "Inaccuracy" };
+const SEVERITY_LABEL: Record<Severity, string> = { blunder: "Blunder", miss: "Miss", mistake: "Mistake", inaccuracy: "Inaccuracy" };
 
 export function severityText(severity: Severity, count: number): string {
-  const word = severity === "inaccuracy" ? (count === 1 ? "inaccuracy" : "inaccuracies") : `${severity}${count === 1 ? "" : "s"}`;
+  const word =
+    severity === "inaccuracy" ? (count === 1 ? "inaccuracy" : "inaccuracies") : severity === "miss" ? (count === 1 ? "miss" : "misses") : `${severity}${count === 1 ? "" : "s"}`;
   return `${count} ${word}`;
 }
 
@@ -15,9 +16,10 @@ export function SeverityChip({ severity, count }: { severity: Severity; count?: 
 }
 
 /** "1 blunder · 2 mistakes" style summary, or null when clean. */
-export function flagsSummary(f: { blunders?: number | null; mistakes?: number | null; inaccuracies?: number | null }): string | null {
+export function flagsSummary(f: { blunders?: number | null; misses?: number | null; mistakes?: number | null; inaccuracies?: number | null }): string | null {
   const parts: string[] = [];
   if (f.blunders) parts.push(severityText("blunder", f.blunders));
+  if (f.misses) parts.push(severityText("miss", f.misses));
   if (f.mistakes) parts.push(severityText("mistake", f.mistakes));
   if (!f.blunders && !f.mistakes && f.inaccuracies) parts.push(severityText("inaccuracy", f.inaccuracies));
   return parts.length ? parts.join(" · ") : null;

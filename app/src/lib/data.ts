@@ -14,13 +14,38 @@ export type GameRow = {
   opening_name: string | null;
   accuracy_ours: number | null;
   blunders: number | null;
+  misses: number | null;
   mistakes: number | null;
   inaccuracies: number | null;
   analysis_status: string;
+  my_rating: number | null;
+  result_detail: string | null;
+  move_count: number | null;
+  time_control: string | null;
+  accuracy_chesscom: number | null;
 };
 
 const GAME_COLUMNS =
-  "id, opponent, opponent_rating, my_color, result, time_class, end_time, eco, opening_name, accuracy_ours, blunders, mistakes, inaccuracies, analysis_status";
+  "id, opponent, opponent_rating, my_color, result, time_class, end_time, eco, opening_name, accuracy_ours, blunders, misses, mistakes, inaccuracies, analysis_status, my_rating, result_detail, move_count, time_control, accuracy_chesscom";
+
+/** Every imported chess.com game, newest first (paged past the API's 1,000-row cap). */
+export async function getAllGames(): Promise<GameRow[]> {
+  const db = await getDb();
+  const out: GameRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from(T.games)
+      .select(GAME_COLUMNS)
+      .eq("source", "chesscom")
+      .order("end_time", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`getAllGames: ${error.message}`);
+    out.push(...((data ?? []) as GameRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return out;
+}
 
 export async function getRecentGames(limit = 10, timeClasses: string[] = ["rapid", "blitz"]): Promise<GameRow[]> {
   const db = await getDb();

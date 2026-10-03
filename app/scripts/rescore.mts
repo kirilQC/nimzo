@@ -1,9 +1,13 @@
 // Re-scores already-analyzed games from their stored evals after the label
 // thresholds or accuracy formula change. No engine re-run needed.
-// Usage (from app/): node --env-file=.env.local scripts/rescore.mts [--dry]
+// Also fills in move counts for every imported game (read from the PGN).
+// Usage (from app/): npx tsx --env-file=.env.local scripts/rescore.mts [--dry]
 import { createClient } from "@supabase/supabase-js";
 import { Chess } from "chess.js";
-import { THRESHOLDS, gameAccuracy, judgeMove, type Score } from "../src/lib/analysis/math.ts";
+import { THRESHOLDS, gameAccuracy, isSeverity, judgeMove, type Score } from "../src/lib/analysis/math";
+import { isBookPosition } from "../src/lib/chess/book";
+import { moveContext } from "../src/lib/chess/moveContext";
+import { moveCount } from "../src/lib/chesscom/map";
 
 const dry = process.argv.includes("--dry");
 const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,21 +37,35 @@ for (const g of games!) {
   const list = (pos ?? []) as Pos[];
   if (list.length < 2) continue;
   const accs: number[] = [];
-  const totals = { blunders: 0, mistakes: 0, inaccuracies: 0 };
+  const totals = { blunders: 0, misses: 0, mistakes: 0, inaccuracies: 0 };
+  let inBook = true;
   const updates: { ply: number; classification: string; accuracy: number }[] = [];
   const flagged = new Map<number, string>();
   for (let i = 1; i < list.length; i++) {
     const prev = list[i - 1]!, p = list[i]!;
     const mover = new Chess(prev.fen).turn();
-    const j = judgeMove({ before: score(prev), after: score(p), mover, playedBest: p.best_move_uci === p.uci, deliversMate: new Chess(p.fen).isCheckmate() });
+    inBook = inBook && isBookPosition(p.fen);
+    const ctx = p.uci ? moveContext(prev.fen, p.uci) : { legalMoves: 2, sacrifice: false };
+    const j = judgeMove({
+      before: score(prev),
+      after: score(p),
+      mover,
+      playedBest: p.best_move_uci === p.uci,
+      deliversMate: new Chess(p.fen).isCheckmate(),
+      beforeOpponent: i >= 2 ? score(list[i - 2]!) : null,
+      inBook,
+      legalMoves: ctx.legalMoves,
+      sacrifice: ctx.sacrifice,
+    });
     const acc = Math.round(j.accuracy * 100) / 100;
     if (j.classification !== p.classification || Number(p.accuracy) !== acc) updates.push({ ply: p.ply, classification: j.classification, accuracy: acc });
     if (p.is_mine) {
       accs.push(j.accuracy);
       if (j.classification === "blunder") totals.blunders++;
+      else if (j.classification === "miss") totals.misses++;
       else if (j.classification === "mistake") totals.mistakes++;
       else if (j.classification === "inaccuracy") totals.inaccuracies++;
-      if (["blunder", "mistake", "inaccuracy"].includes(j.classification)) flagged.set(p.ply, j.classification);
+      if (isSeverity(j.classification)) flagged.set(p.ply, j.classification);
     }
   }
   const a = gameAccuracy(accs);
@@ -79,3 +97,26 @@ for (const g of games!) {
   if (r.error) throw r.error;
 }
 console.log(`${dry ? "[dry] " : ""}${changedGames} games, ${removed} mistake rows removed, ${relabeled} relabeled`);
+
+// Move counts for every game (cheap: PGN parsing only).
+let filled = 0;
+for (;;) {
+  const { data, error: e } = await db.from("nimzo_games").select("id, pgn, move_count").is("move_count", null).range(0, 499);
+  if (e) throw e;
+  if (!data?.length) break;
+  for (const g of data) {
+    let n: number;
+    try {
+      n = moveCount(g.pgn);
+    } catch {
+      n = 0;
+    }
+    if (!dry) {
+      const r = await db.from("nimzo_games").update({ move_count: n }).eq("id", g.id);
+      if (r.error) throw r.error;
+    }
+    filled++;
+  }
+  if (dry) break; // nothing changes in a dry run, so the same rows would come back
+}
+console.log(`${dry ? "[dry] " : ""}move counts filled for ${filled} games`);

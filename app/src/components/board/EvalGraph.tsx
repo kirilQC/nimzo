@@ -7,7 +7,7 @@ export type GraphPoint = { ply: number; whitePct: number | null; severity?: Seve
 
 const W = 600;
 const H = 120;
-const MARKER_COLOR: Record<Severity, string> = { blunder: "#9E2B25", mistake: "#C9832E", inaccuracy: "#C9A063" };
+const MARKER_COLOR: Record<Severity, string> = { blunder: "#9E2B25", miss: "#E0584A", mistake: "#C9832E", inaccuracy: "#C9A063" };
 
 /**
  * Win% across the game (White's perspective, 50% = level). Click anywhere to

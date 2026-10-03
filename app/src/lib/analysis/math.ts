@@ -8,14 +8,32 @@
 /** An engine score from WHITE's perspective. `mate` > 0 means White mates in N. */
 export type Score = { cp: number; mate?: undefined } | { mate: number; cp?: undefined };
 
-export type Classification = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
-export type Severity = Exclude<Classification, "best" | "good">;
+/** chess.com's ten move labels, plus "forced" (the only legal move; shown without a badge). */
+export type Classification =
+  | "brilliant" | "great" | "book" | "best" | "excellent" | "good"
+  | "inaccuracy" | "mistake" | "miss" | "blunder" | "forced";
+export type Severity = "inaccuracy" | "mistake" | "miss" | "blunder";
 
 /**
  * Drops on the "winning chances" scale (−1…+1); 0.1 = 5 win-percentage points.
  * Fitted to chess.com (Lichess uses 0.1 / 0.2 / 0.3, which flags far more moves).
  */
-export const THRESHOLDS = { inaccuracy: 0.16, mistake: 0.24, blunder: 0.6 } as const;
+export const THRESHOLDS = { inaccuracy: 0.16, mistake: 0.28, blunder: 0.6 } as const;
+
+/**
+ * The other labels, in win-% points (0–100) from the mover's side, fitted to
+ * chess.com on 35 games (calibration/fit3.mjs). A "gift" is how much the
+ * opponent's previous move handed you.
+ */
+export const LABEL_FIT = {
+  excellent: 2.5, // max loss for Excellent (more is Good)
+  missGift: 10, // Miss: opponent gave at least this much…
+  missDrop: 15, // …you gave at least this much back…
+  missTol: 20, // …and you ended up no more than this far below where you were before their gift
+  greatGift: 20, // Great: the engine's move right after a gift this big
+  brilliantMaxLoss: 2.5, // Brilliant: a sound piece sacrifice…
+  brilliantMaxWinBefore: 90, // …when you weren't already completely winning
+} as const;
 export type Thresholds = { inaccuracy: number; mistake: number; blunder: number };
 
 export const CP_CLAMP = 1000;
@@ -84,7 +102,9 @@ export type MoveJudgement = {
 /**
  * Judges one move from the mover's perspective.
  * `before` is the score of the position the move was played from (best play),
- * `after` the score of the resulting position. A missed forced mate counts as a blunder.
+ * `after` the score of the resulting position, `beforeOpponent` the score before
+ * the opponent's previous move (to spot gifts). A missed forced mate while still
+ * winning is a Miss; otherwise it's judged by how much was lost.
  */
 export function judgeMove(args: {
   before: Score;
@@ -92,6 +112,10 @@ export function judgeMove(args: {
   mover: "w" | "b";
   playedBest: boolean;
   deliversMate: boolean;
+  beforeOpponent?: Score | null;
+  inBook?: boolean;
+  legalMoves?: number;
+  sacrifice?: boolean;
   thresholds?: Thresholds;
 }): MoveJudgement {
   const t = args.thresholds ?? THRESHOLDS;
@@ -107,11 +131,24 @@ export function judgeMove(args: {
   const moverMateAfter = mateFor(args.after, args.mover);
   const missedMate = !args.deliversMate && moverMateBefore !== null && moverMateBefore > 0 && (moverMateAfter === null || moverMateAfter <= 0);
 
+  const lost = winBefore - winAfter; // win-% points
+  const winPrev = args.beforeOpponent ? sideWinPct(args.beforeOpponent, args.mover) : winBefore;
+  const gift = winBefore - winPrev;
+  const f = LABEL_FIT;
+
   let classification: Classification;
-  if (missedMate || drop >= t.blunder) classification = "blunder";
+  if (args.inBook) classification = "book";
+  else if (args.legalMoves === 1) classification = "forced";
+  else if (gift >= f.missGift && lost >= f.missDrop && winAfter >= winPrev - f.missTol) classification = "miss";
+  else if (missedMate && winAfter >= 50 && drop < t.blunder) classification = "miss";
+  else if (missedMate || drop >= t.blunder) classification = "blunder";
   else if (drop >= t.mistake) classification = "mistake";
   else if (drop >= t.inaccuracy) classification = "inaccuracy";
-  else classification = args.playedBest ? "best" : "good";
+  else if (args.sacrifice && lost <= f.brilliantMaxLoss && winBefore <= f.brilliantMaxWinBefore && winAfter >= 50) classification = "brilliant";
+  else if (args.playedBest && gift >= f.greatGift) classification = "great";
+  else if (args.playedBest || lost <= 0) classification = "best";
+  else if (lost <= f.excellent) classification = "excellent";
+  else classification = "good";
 
   return { winBefore, winAfter, drop, accuracy, classification, missedMate };
 }
@@ -123,7 +160,7 @@ export function mateFor(score: Score, side: "w" | "b"): number | null {
 }
 
 export function isSeverity(c: string | null | undefined): c is Severity {
-  return c === "blunder" || c === "mistake" || c === "inaccuracy";
+  return c === "blunder" || c === "miss" || c === "mistake" || c === "inaccuracy";
 }
 
 /** "+1.2", "−0.4", "#3", "#−2" from White's perspective. */

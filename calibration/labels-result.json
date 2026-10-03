@@ -1,0 +1,126 @@
+{
+  "params": {
+    "inaccuracy": 8,
+    "mistake": 14,
+    "blunder": 30,
+    "bestEps": 0,
+    "excellent": 2.5,
+    "missGift": 10,
+    "missDrop": 15,
+    "missTol": 20,
+    "greatGift": 20,
+    "greatFloor": 0
+  },
+  "train": {
+    "acc": 0.5855932203389831,
+    "n": 1180,
+    "per": {
+      "book": {
+        "n": 82,
+        "hit": 70,
+        "predicted": 75
+      },
+      "good": {
+        "n": 179,
+        "hit": 94,
+        "predicted": 183
+      },
+      "excellent": {
+        "n": 218,
+        "hit": 72,
+        "predicted": 160
+      },
+      "inaccuracy": {
+        "n": 107,
+        "hit": 43,
+        "predicted": 83
+      },
+      "best": {
+        "n": 310,
+        "hit": 278,
+        "predicted": 496
+      },
+      "great": {
+        "n": 53,
+        "hit": 28,
+        "predicted": 40
+      },
+      "mistake": {
+        "n": 111,
+        "hit": 32,
+        "predicted": 42
+      },
+      "miss": {
+        "n": 64,
+        "hit": 29,
+        "predicted": 39
+      },
+      "blunder": {
+        "n": 39,
+        "hit": 28,
+        "predicted": 45
+      },
+      "forced": {
+        "n": 17,
+        "hit": 17,
+        "predicted": 17
+      }
+    }
+  },
+  "test": {
+    "acc": 0.6264775413711584,
+    "n": 846,
+    "per": {
+      "book": {
+        "n": 86,
+        "hit": 79,
+        "predicted": 82
+      },
+      "excellent": {
+        "n": 136,
+        "hit": 65,
+        "predicted": 135
+      },
+      "good": {
+        "n": 127,
+        "hit": 65,
+        "predicted": 139
+      },
+      "best": {
+        "n": 229,
+        "hit": 197,
+        "predicted": 292
+      },
+      "blunder": {
+        "n": 35,
+        "hit": 26,
+        "predicted": 35
+      },
+      "miss": {
+        "n": 42,
+        "hit": 18,
+        "predicted": 38
+      },
+      "great": {
+        "n": 38,
+        "hit": 19,
+        "predicted": 31
+      },
+      "mistake": {
+        "n": 76,
+        "hit": 24,
+        "predicted": 32
+      },
+      "inaccuracy": {
+        "n": 72,
+        "hit": 32,
+        "predicted": 57
+      },
+      "forced": {
+        "n": 5,
+        "hit": 5,
+        "predicted": 5
+      }
+    }
+  }
+}

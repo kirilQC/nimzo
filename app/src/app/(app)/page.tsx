@@ -4,7 +4,7 @@ import { SessionCard } from "@/components/home/SessionCard";
 import { GamesTable } from "@/components/home/GamesTable";
 import { PatternBars } from "@/components/home/PatternBars";
 import { BacklogButton } from "@/components/home/BacklogButton";
-import { ArthurSays } from "@/components/coach/SpokenText";
+import { CoachAvatar } from "@/components/coach/CoachAvatar";
 import { getPatternStats, getRecentGames, getSettings, needsBackfill } from "@/lib/data";
 import { getOpenSession, getSessionGames } from "@/lib/sessions";
 
@@ -33,7 +33,7 @@ export default async function HomePage() {
 
       <section className="card-dark flex flex-col p-6" aria-labelledby="note-h">
         <div className="mb-3 flex items-center gap-3">
-          <ArthurSays size={56} text={settings.coach_note} onceKey={settings.coach_note_updated_at ? `note-${settings.coach_note_updated_at}` : null} />
+          <CoachAvatar size={56} />
           <h2 id="note-h" className="eyebrow">
             Coach&apos;s note
           </h2>

@@ -24,6 +24,8 @@ Write:
 1. For every flagged move, an explanation of 2 to 4 sentences: what went wrong, why it was tempting, what the engine preferred, and the habit that would have caught it. Mention the engine's preferred move. Mention the opponent's punishing reply when there is one.
 2. A short game summary: the key moment (one or two sentences), what went well (one sentence, concrete, from the data; if nothing notable, say the player kept fighting or similar without inventing details), and one thing to work on (one sentence, a habit).
 
+Severities follow chess.com: inaccuracy, mistake, blunder, and miss. A miss means the opponent had just made an error and the player didn't take advantage of it; explain what the opponent's error allowed and what the player let slip.
+
 Return explanations keyed by ply, exactly one per flagged move.`;
 
 export const COACH_NOTE_TASK = `Task: write the coach's note for the home page: ONE sentence (max 30 words) about the player's biggest recurring habit, based only on the pattern statistics given (motif, how many of the recent games it appeared in). Make it concrete and actionable, in the coach voice. No moves, no numbers other than game counts.`;
@@ -40,11 +42,11 @@ Write:
 
 Only use facts from the data.`;
 
-export const GAME_QA_TASK = `Task: answer the player's question about one finished game, out loud, as Arthur.
+export const GAME_QA_TASK = `Task: answer the player's question about one finished game, as Arthur.
 
 You get the game (moves, result, opening), your earlier summary, the verified facts for each flagged move, the engine data for the position the player is currently looking at, and the recent conversation.
 
 Rules for the answer:
-- 2 to 4 short sentences, spoken style (it will be read aloud), no lists, no headings, no notation tables.
+- 2 to 4 short sentences, conversational, no lists, no headings, no notation tables.
 - Answer what was asked. If the data doesn't cover it (for example a variation the engine never looked at), say so plainly and suggest what the player can check instead. Never invent a line or evaluation.
 - Mention moves exactly as they appear in the data.`;

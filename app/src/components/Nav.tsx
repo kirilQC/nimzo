@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnalysisStatus } from "@/components/analysis/AnalysisProvider";
-import { VoiceToggle } from "@/components/coach/VoiceProvider";
 
 const LINKS = [
-  { href: "/", label: "Analyze", match: (p: string) => p === "/" || p.startsWith("/games") },
+  { href: "/", label: "Analyze", match: (p: string) => p === "/" },
+  { href: "/games", label: "My games", match: (p: string) => p.startsWith("/games") },
   { href: "/learn", label: "Learn", match: (p: string) => p.startsWith("/learn") },
   { href: "/sessions", label: "Sessions", match: (p: string) => p.startsWith("/sessions") },
 ];
@@ -43,7 +43,6 @@ export function Nav({ username }: { username: string }) {
         </nav>
         <div className="ml-auto flex items-center gap-4 text-[0.8125rem] text-muted">
           <AnalysisStatus />
-          <VoiceToggle />
           <span>
             chess.com · <span className="text-body2">{username}</span>
           </span>

@@ -91,6 +91,7 @@ export async function runEngineAnalysis(args: {
       mover: p.color,
       playedBest: before.bestUci === p.uci,
       deliversMate: after.terminal === "checkmate",
+      beforeOpponent: p.ply >= 2 ? positions[p.ply - 2]!.score : null,
       thresholds: args.thresholds ?? THRESHOLDS,
     });
     if (isSeverity(j.classification)) flagged.push(p.ply);

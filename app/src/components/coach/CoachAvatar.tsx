@@ -1,7 +1,7 @@
 import { COACH } from "@/lib/coach/persona";
 
 /** Arthur's face, round, in a brass ring. */
-export function CoachAvatar({ size = 56, className = "" }: { size?: number; speaking?: boolean; className?: string }) {
+export function CoachAvatar({ size = 56, className = "" }: { size?: number; className?: string }) {
   return (
     <span
       className={`relative inline-block shrink-0 rounded-full ${className}`}

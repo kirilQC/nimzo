@@ -51,7 +51,7 @@ const pick = <T,>(options: T[], seed: number): T => options[Math.abs(seed) % opt
 
 /** Expression while Arthur explains one of your flagged moves. */
 export function expressionForMistake(args: {
-  severity: "blunder" | "mistake" | "inaccuracy";
+  severity: "blunder" | "miss" | "mistake" | "inaccuracy";
   ply: number;
   clockMs: number | null;
   missedMate?: boolean;

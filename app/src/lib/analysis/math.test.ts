@@ -37,12 +37,13 @@ describe("moveAccuracy (fitted to chess.com)", () => {
 
 describe("judgeMove thresholds", () => {
   // White to move at +0 (50%). Drops measured in winning chances: 0.1 = 5 points.
-  // Thresholds 8 / 12 / 30 points ≈ 0.9 / 1.3 / 3.8 pawns from equality.
+  // Thresholds 8 / 14 / 30 points ≈ 0.9 / 1.6 / 3.8 pawns from equality.
   const judge = (afterCp: number, playedBest = false) =>
     judgeMove({ before: { cp: 0 }, after: { cp: afterCp }, mover: "w", playedBest, deliversMate: false });
 
   it("classifies by drop size", () => {
-    expect(judge(-10).classification).toBe("good");
+    expect(judge(-10).classification).toBe("excellent"); // ~0.9 points
+    expect(judge(-40).classification).toBe("good"); // ~3.7 points
     expect(judge(0, true).classification).toBe("best");
     expect(judge(-60).classification).toBe("good"); // ~5.5 points
     expect(judge(-100).classification).toBe("inaccuracy"); // ~9.1 points
@@ -61,10 +62,25 @@ describe("judgeMove thresholds", () => {
     expect(j.classification).toBe("good");
   });
 
-  it("flags a missed forced mate as a blunder even if still winning", () => {
+  it("calls a missed forced mate a Miss while still winning, a Blunder once it throws the game", () => {
     const j = judgeMove({ before: { mate: 2 }, after: { cp: 950 }, mover: "w", playedBest: false, deliversMate: false });
     expect(j.missedMate).toBe(true);
-    expect(j.classification).toBe("blunder");
+    expect(j.classification).toBe("miss");
+    expect(judgeMove({ before: { mate: 2 }, after: { cp: -300 }, mover: "w", playedBest: false, deliversMate: false }).classification).toBe("blunder");
+  });
+
+  it("labels book, forced, miss, great and brilliant moves", () => {
+    const base = { mover: "w" as const, deliversMate: false };
+    expect(judgeMove({ ...base, before: { cp: 30 }, after: { cp: -200 }, playedBest: false, inBook: true }).classification).toBe("book");
+    expect(judgeMove({ ...base, before: { cp: 0 }, after: { cp: -500 }, playedBest: true, legalMoves: 1 }).classification).toBe("forced");
+    // Opponent blundered (0 -> +500 for us) and we gave it all back: Miss, not Blunder.
+    expect(judgeMove({ ...base, beforeOpponent: { cp: 0 }, before: { cp: 500 }, after: { cp: 0 }, playedBest: false }).classification).toBe("miss");
+    // Same gift, and we found the engine's move: Great.
+    expect(judgeMove({ ...base, beforeOpponent: { cp: 0 }, before: { cp: 500 }, after: { cp: 500 }, playedBest: true }).classification).toBe("great");
+    // A sound sacrifice from a balanced position: Brilliant.
+    expect(judgeMove({ ...base, before: { cp: 50 }, after: { cp: 60 }, playedBest: true, sacrifice: true }).classification).toBe("brilliant");
+    // The same sacrifice when already completely winning is just Best.
+    expect(judgeMove({ ...base, before: { cp: 900 }, after: { cp: 900 }, playedBest: true, sacrifice: true }).classification).toBe("best");
   });
 
   it("does not flag the mating move itself", () => {

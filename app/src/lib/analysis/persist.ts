@@ -1,6 +1,8 @@
 import { Chess } from "chess.js";
 import { z } from "zod";
 import { pgnToPositions } from "../chess/pgn";
+import { isBookPosition } from "../chess/book";
+import { moveContext } from "../chess/moveContext";
 import { THRESHOLDS, gameAccuracy, judgeMove, whiteWinPct, type Score, type Thresholds } from "./math";
 
 const scoreSchema = z.union([z.object({ cp: z.number().int() }), z.object({ mate: z.number().int() })]) as z.ZodType<Score>;
@@ -75,7 +77,7 @@ export function buildAnalysis(args: {
   thresholds?: Thresholds;
 }): {
   rows: PositionRow[];
-  totals: { accuracy_ours: number | null; blunders: number; mistakes: number; inaccuracies: number };
+  totals: { accuracy_ours: number | null; blunders: number; misses: number; mistakes: number; inaccuracies: number };
 } {
   const game = pgnToPositions(args.pgn);
   const n = game.plies.length;
@@ -90,7 +92,8 @@ export function buildAnalysis(args: {
   const fens = [game.startFen, ...game.plies.map((p) => p.fenAfter)];
   const rows: PositionRow[] = [];
   const accs: number[] = [];
-  const totals = { blunders: 0, mistakes: 0, inaccuracies: 0 };
+  const totals = { blunders: 0, misses: 0, mistakes: 0, inaccuracies: 0 };
+  let inBook = true; // Book until the game first leaves the opening list
 
   for (let i = 0; i <= n; i++) {
     const e = evals[i]!;
@@ -100,12 +103,18 @@ export function buildAnalysis(args: {
     let accuracy: number | null = null;
 
     if (p && prev) {
+      inBook = inBook && isBookPosition(fens[i]!);
+      const ctx = moveContext(fens[i - 1]!, p.uci);
       const j = judgeMove({
         before: prev.score,
         after: e.score,
         mover: p.color,
         playedBest: prev.bestUci === p.uci,
         deliversMate: e.terminal === "checkmate",
+        beforeOpponent: i >= 2 ? evals[i - 2]!.score : null,
+        inBook,
+        legalMoves: ctx.legalMoves,
+        sacrifice: ctx.sacrifice,
         thresholds: args.thresholds ?? THRESHOLDS,
       });
       classification = j.classification;
@@ -113,6 +122,7 @@ export function buildAnalysis(args: {
       if (p.color === mine) {
         accs.push(j.accuracy);
         if (j.classification === "blunder") totals.blunders++;
+        else if (j.classification === "miss") totals.misses++;
         else if (j.classification === "mistake") totals.mistakes++;
         else if (j.classification === "inaccuracy") totals.inaccuracies++;
       }

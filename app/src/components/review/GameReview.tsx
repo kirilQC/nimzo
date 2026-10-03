@@ -6,6 +6,8 @@ import { Board } from "@/components/board/Board";
 import { EvalBar } from "@/components/board/EvalBar";
 import { EvalGraph } from "@/components/board/EvalGraph";
 import { SeverityChip, type Severity } from "@/components/ui";
+import { MoveIcon } from "@/components/board/MoveIcon";
+import { LABEL_SUFFIX, MOVE_LABELS, type LabelId } from "@/lib/analysis/labels";
 import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { ArthurPanel } from "@/components/coach/ArthurPanel";
@@ -21,6 +23,7 @@ export type ReviewPly = {
   clockMs: number | null;
   isMine: boolean;
   severity: Severity | null;
+  label: LabelId | null;
   whitePct: number | null;
 };
 
@@ -53,9 +56,10 @@ export type ReviewData = {
   summary: { key_moment: string; went_well: string; work_on: string } | null;
   result: "win" | "loss" | "draw" | null;
   accuracy: number | null;
+  accuracyOpponent: number | null;
+  counts: { me: Record<LabelId, number>; opponent: Record<LabelId, number> } | null;
+  players?: { me: string; opponent: string };
 };
-
-const SUFFIX: Record<Severity, string> = { blunder: "??", mistake: "?", inaccuracy: "?!" };
 
 function moveLabel(p: { ply: number; color: "w" | "b"; san: string }, suffix = "") {
   return `${Math.ceil(p.ply / 2)}${p.color === "w" ? "." : "..."} ${p.san}${suffix}`;
@@ -142,6 +146,7 @@ export function GameReview({ data }: { data: ReviewData }) {
                 fen={fen}
                 orientation={myColor}
                 lastMove={pos ? { from: pos.from, to: pos.to } : null}
+                badge={pos?.label ? { square: pos.to, label: pos.label } : null}
                 label={pos ? `Position after ${moveLabel(pos)}` : "Starting position"}
               />
             </div>
@@ -176,6 +181,8 @@ export function GameReview({ data }: { data: ReviewData }) {
             onSelect={go}
           />
         </section>
+
+        {data.counts && <MoveSummary data={data} counts={data.counts} />}
       </div>
 
       {/* Coach, ask and moves column */}
@@ -255,8 +262,63 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
         active ? "bg-chip text-ink" : "text-body2 hover:bg-chip/60"
       }`}
     >
-      {p.san}
+      <span className="inline-flex items-center gap-1.5">
+        {p.label && p.label !== "good" && p.label !== "excellent" ? <MoveIcon label={p.label} size={16} /> : <span className="inline-block w-4" />}
+        {p.san}
+      </span>
     </button>
+  );
+}
+
+/** chess.com's review tally: every label, your count and your opponent's, with accuracies. */
+function MoveSummary({ data, counts }: { data: ReviewData; counts: NonNullable<ReviewData["counts"]> }) {
+  const me = data.players?.me ?? "You";
+  const opp = data.players?.opponent ?? "Opponent";
+  const [left, right] = data.myColor === "white" ? [me, opp] : [opp, me];
+  const [lc, rc] = data.myColor === "white" ? [counts.me, counts.opponent] : [counts.opponent, counts.me];
+  const [la, ra] = data.myColor === "white" ? [data.accuracy, data.accuracyOpponent] : [data.accuracyOpponent, data.accuracy];
+  return (
+    <section className="card" aria-labelledby="summary-h">
+      <h2 id="summary-h" className="eyebrow mb-3">
+        Move summary
+      </h2>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-muted">
+            <th className="pb-2 text-left font-normal">
+              <span className="sr-only">Label</span>
+            </th>
+            <th className="pb-2 text-center font-semibold text-ink">{left}</th>
+            <th className="pb-2" aria-hidden="true" />
+            <th className="pb-2 text-center font-semibold text-ink">{right}</th>
+          </tr>
+          <tr>
+            <th className="pb-2 text-left font-normal text-muted">Accuracy</th>
+            <td className="mono pb-2 text-center text-lg text-ink">{la !== null ? la.toFixed(1) : "–"}</td>
+            <td />
+            <td className="mono pb-2 text-center text-lg text-ink">{ra !== null ? ra.toFixed(1) : "–"}</td>
+          </tr>
+        </thead>
+        <tbody>
+          {MOVE_LABELS.map((l) => (
+            <tr key={l.id} className="border-t border-line-soft">
+              <th scope="row" className="py-1.5 text-left font-semibold text-ink">
+                {l.name}
+              </th>
+              <td className="mono py-1.5 text-center font-bold" style={{ color: l.color }}>
+                {lc[l.id]}
+              </td>
+              <td className="py-1.5 text-center">
+                <MoveIcon label={l.id} size={22} />
+              </td>
+              <td className="mono py-1.5 text-center font-bold" style={{ color: l.color }}>
+                {rc[l.id]}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -296,7 +358,7 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
     <section className="card p-6" aria-labelledby="coach-h">
       <div className="flex flex-wrap items-center gap-2.5">
         <h2 id="coach-h" className="mono text-xl font-medium">
-          {moveLabel(ply, SUFFIX[ply.severity])}
+          {moveLabel(ply, LABEL_SUFFIX[ply.severity] ?? "")}
         </h2>
         <SeverityChip severity={ply.severity} />
         {info?.evalBefore && info.evalAfter && (
