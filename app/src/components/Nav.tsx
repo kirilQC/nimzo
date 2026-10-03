@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AnalysisStatus } from "@/components/analysis/AnalysisProvider";
 
 const LINKS = [
   { href: "/", label: "Analyze", match: (p: string) => p === "/" || p.startsWith("/games") },
@@ -39,7 +40,8 @@ export function Nav({ username }: { username: string }) {
             })}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-2 text-[0.8125rem] text-muted">
+        <div className="ml-auto flex items-center gap-4 text-[0.8125rem] text-muted">
+          <AnalysisStatus />
           <span>
             chess.com · <span className="text-body2">{username}</span>
           </span>

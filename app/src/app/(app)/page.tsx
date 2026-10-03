@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/ui";
 import { SessionCard } from "@/components/home/SessionCard";
 import { GamesTable } from "@/components/home/GamesTable";
 import { PatternBars } from "@/components/home/PatternBars";
+import { BacklogButton } from "@/components/home/BacklogButton";
 import { getPatternStats, getRecentGames, getSettings, needsBackfill } from "@/lib/data";
 import { getOpenSession, getSessionGames } from "@/lib/sessions";
 
@@ -46,9 +47,12 @@ export default async function HomePage() {
       </section>
 
       <section aria-labelledby="recent-h" className="min-w-0">
-        <h2 id="recent-h" className="section-title">
-          Recent games
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="recent-h" className="section-title">
+            Recent games
+          </h2>
+          <BacklogButton />
+        </div>
         {games.length ? (
           <GamesTable games={games} caption="Recent rapid and blitz games" />
         ) : (

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameReview, type ReviewData } from "@/components/review/GameReview";
+import { buildReviewData, type PositionRecord } from "@/lib/review";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
-import { pgnToPositions } from "@/lib/chess/pgn";
 import { SAMPLE_PGN } from "@/lib/chess/sample";
 import { formatDate } from "@/lib/format";
 
@@ -21,29 +21,6 @@ export const metadata: Metadata = { title: "Game review" };
 
 type Header = { title: string; meta: string[] };
 
-function buildReview(pgn: string, myColor: "white" | "black"): ReviewData {
-  const parsed = pgnToPositions(pgn);
-  const mine = myColor === "white" ? "w" : "b";
-  return {
-    startFen: parsed.startFen,
-    myColor,
-    analyzed: false,
-    coach: {},
-    plies: parsed.plies.map((p) => ({
-      ply: p.ply,
-      san: p.san,
-      from: p.from,
-      to: p.to,
-      color: p.color,
-      fenAfter: p.fenAfter,
-      clockMs: p.clockMs,
-      isMine: p.color === mine,
-      severity: null,
-      whitePct: null,
-    })),
-  };
-}
-
 export default async function GamePage({ params }: PageProps<"/games/[id]">) {
   const { id } = await params;
 
@@ -51,18 +28,30 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
   let data: ReviewData;
 
   if (id === "sample") {
-    data = buildReview(SAMPLE_PGN, "white");
+    data = buildReviewData({ gameId: null, pgn: SAMPLE_PGN, myColor: "white", status: "imported", error: null, positions: [] });
     header = { title: "You (White) vs shilling_fan", meta: ["Sample", "Loss", "10 min rapid", "Italian Game: Blackburne–Shilling Gambit"] };
   } else {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
     const db = await getDb();
     const { data: game } = await db
       .from(T.games)
-      .select("id, pgn, my_color, opponent, result, time_class, time_control, end_time, eco, opening_name, accuracy_ours")
+      .select("id, pgn, my_color, opponent, result, time_class, time_control, end_time, eco, opening_name, accuracy_ours, analysis_status, analysis_error")
       .eq("id", id)
       .maybeSingle();
     if (!game) notFound();
-    data = buildReview(game.pgn, game.my_color);
+    const { data: positions } = await db
+      .from(T.positions)
+      .select("ply, eval_cp, eval_mate, win_pct, classification, best_move_san, pv_san, multipv, clock_ms")
+      .eq("game_id", id)
+      .order("ply");
+    data = buildReviewData({
+      gameId: game.id,
+      pgn: game.pgn,
+      myColor: game.my_color,
+      status: game.analysis_status,
+      error: game.analysis_error,
+      positions: (positions ?? []) as PositionRecord[],
+    });
     const color = game.my_color === "white" ? "White" : "Black";
     header = {
       title: `You (${color}) vs ${game.opponent}`,

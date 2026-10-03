@@ -31,12 +31,18 @@ export function GamesTable({ games, caption }: { games: GameRow[]; caption: stri
               <td className="text-body2" aria-label={RESULT_LABEL[g.result]}>
                 {RESULT_TEXT[g.result]}
               </td>
-              <td className="max-w-[220px] truncate text-walnut" title={[g.eco, g.opening_name].filter(Boolean).join(" ")}>
+              <td className="max-w-[180px] truncate text-walnut" title={[g.eco, g.opening_name].filter(Boolean).join(" ")}>
                 {g.opening_name ?? "—"}
               </td>
               <td className="mono text-ink">{g.accuracy_ours !== null ? Number(g.accuracy_ours).toFixed(1) : "—"}</td>
-              <td className="text-walnut">
-                {g.analysis_status === "imported" ? <span className="text-muted">Not analyzed</span> : flagsSummary(g) ?? "Clean"}
+              <td className="min-w-[120px] whitespace-normal text-walnut">
+                {g.analysis_status === "imported" ? (
+                  <span className="text-muted">Not analyzed</span>
+                ) : g.analysis_status === "failed" ? (
+                  <span className="text-[color:var(--blunder-bg)]">Analysis failed</span>
+                ) : (
+                  flagsSummary(g) ?? "Clean"
+                )}
               </td>
               <td className="text-right">
                 <Link href={`/games/${g.id}`} className="arrow-link">

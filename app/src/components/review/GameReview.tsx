@@ -7,6 +7,7 @@ import { EvalBar } from "@/components/board/EvalBar";
 import { EvalGraph } from "@/components/board/EvalGraph";
 import { SeverityChip, type Severity } from "@/components/ui";
 import { formatClock } from "@/lib/chess/pgn";
+import { AnalysisProgress } from "./AnalysisProgress";
 
 export type ReviewPly = {
   ply: number;
@@ -24,9 +25,13 @@ export type ReviewPly = {
 export type CoachInfo = {
   ply: number;
   explanation: string | null;
-  bestMoveSan: string | null;
+  bestMoveSan: string | null; // with move number, e.g. "5. Bxf7+"
   bestMoveEval: string | null;
   bestMoveNote: string | null;
+  bestLine: string | null; // numbered SAN line from the engine
+  punishLine: string | null; // opponent's best reply after my move, numbered
+  punishEval: string | null;
+  missedMate: boolean;
   evalBefore: string | null;
   evalAfter: string | null;
   tags: { id: string; label: string; confidence: number | null }[];
@@ -35,6 +40,9 @@ export type CoachInfo = {
 };
 
 export type ReviewData = {
+  gameId: string | null; // null for the sample layout
+  status: string;
+  error: string | null;
   startFen: string;
   myColor: "white" | "black";
   plies: ReviewPly[];
@@ -159,7 +167,7 @@ export function GameReview({ data }: { data: ReviewData }) {
 
       {/* Coach, ask and moves column */}
       <div className="min-w-0 space-y-4">
-        <CoachCard ply={pos} info={selectedCoach} analyzed={data.analyzed} />
+        <CoachCard ply={pos} info={selectedCoach} data={data} />
 
         <form className="card" onSubmit={(e) => e.preventDefault()}>
           <label htmlFor="ask-game" className="mb-2 block text-sm font-semibold text-ink">
@@ -225,8 +233,15 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
   );
 }
 
-function CoachCard({ ply, info, analyzed }: { ply?: ReviewPly; info?: CoachInfo; analyzed: boolean }) {
-  if (!analyzed) {
+function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; data: ReviewData }) {
+  if (!data.analyzed && data.gameId) {
+    return (
+      <section className="card p-6" aria-label="Analysis">
+        <AnalysisProgress gameId={data.gameId} status={data.status} error={data.error} />
+      </section>
+    );
+  }
+  if (!data.analyzed) {
     return (
       <section className="card p-6" aria-labelledby="coach-h">
         <h2 id="coach-h" className="text-xl">
@@ -262,15 +277,33 @@ function CoachCard({ ply, info, analyzed }: { ply?: ReviewPly; info?: CoachInfo;
           </span>
         )}
       </div>
-      <p className="serif mt-3 text-[1.0625rem] leading-relaxed text-ink">
-        {info?.explanation ?? "The coach's explanation appears here once this move has been reviewed."}
-      </p>
+      {info?.explanation && <p className="serif mt-3 text-[1.0625rem] leading-relaxed text-ink">{info.explanation}</p>}
+      {info?.missedMate && <p className="mt-3 text-sm font-semibold text-ink">You had a forced mate here.</p>}
       {info?.bestMoveSan && (
         <p className="mt-3 text-sm text-body2">
           The engine preferred <span className="mono font-medium text-ink">{info.bestMoveSan}</span>
           {info.bestMoveEval && <span className="mono"> ({info.bestMoveEval})</span>}
           {info.bestMoveNote && <>: {info.bestMoveNote}</>}
         </p>
+      )}
+      {!info?.explanation && (info?.bestLine || info?.punishLine) && (
+        <dl className="mt-3 space-y-1.5 text-sm">
+          {info.bestLine && (
+            <div>
+              <dt className="inline text-muted">Best line: </dt>
+              <dd className="mono inline text-ink">{info.bestLine}</dd>
+            </div>
+          )}
+          {info.punishLine && (
+            <div>
+              <dt className="inline text-muted">After your move, their best reply: </dt>
+              <dd className="mono inline text-ink">
+                {info.punishLine}
+                {info.punishEval && <span className="text-muted"> ({info.punishEval})</span>}
+              </dd>
+            </div>
+          )}
+        </dl>
       )}
       {info && info.tags.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2" aria-label="Tags">

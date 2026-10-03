@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SeverityChip, type Severity } from "@/components/ui";
+import { useAnalysis, type JobState } from "@/components/analysis/AnalysisProvider";
 
 // FAIR PLAY: Session mode only polls Nimzo's own /api/sync, which imports
 // FINISHED games from chess.com's public archives. Nothing here reads a live
@@ -42,17 +43,13 @@ function timeAgo(iso: string): string {
   return `${Math.floor(mins / 60)} h ${mins % 60} min ago`;
 }
 
-function statusLabel(g: SessionGame): string {
-  switch (g.analysis_status) {
-    case "imported":
-      return "Imported";
-    case "failed":
-      return "Analysis failed";
-    case "reviewed":
-      return `Analyzed · ${timeAgo(g.end_time)}`;
-    default:
-      return "Analyzing";
-  }
+// Syncing -> Analyzing -> Ready, combining the stored status with the live browser job.
+function statusLabel(g: SessionGame, job: JobState | undefined): string {
+  if (job?.state === "analyzing" || job?.state === "saving") return `Analyzing · ${Math.round(job.progress * 100)}%`;
+  if (job?.state === "queued") return "Waiting to analyze";
+  if (job?.state === "failed" || g.analysis_status === "failed") return "Analysis failed";
+  if (g.analysis_status === "imported") return "Waiting to analyze";
+  return `Ready · ${timeAgo(g.end_time)}`;
 }
 
 function readStored(): { id: string; heartbeat: number } | null {
@@ -101,6 +98,7 @@ export function SessionCard({
 }) {
   const labelId = useId();
   const router = useRouter();
+  const analysis = useAnalysis();
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [games, setGames] = useState<SessionGame[]>([]);
@@ -142,6 +140,8 @@ export function SessionCard({
         if (res.sessionGames) setGames(res.sessionGames);
         if (res.newGameIds.length) {
           lastNewAt.current = Date.now();
+          // Auto-analyze new finished games right away, ahead of any backlog.
+          if (sessionId) analysis.enqueue(res.newGameIds, { front: true });
           router.refresh();
         }
         return res;
@@ -153,7 +153,7 @@ export function SessionCard({
         setSyncing(false);
       }
     },
-    [router],
+    [router, analysis],
   );
 
   // First visit: import the last few months. Runs once per mount; the
@@ -316,7 +316,7 @@ export function SessionCard({
                     {flags.map((f) => (
                       <SeverityChip key={f.severity} severity={f.severity} count={f.count} />
                     ))}
-                    <span className="text-muted">{statusLabel(g)}</span>
+                    <span className="text-muted">{statusLabel(g, analysis.jobs[g.id])}</span>
                     <Link href={`/games/${g.id}`} className="arrow-link">
                       Review
                     </Link>
