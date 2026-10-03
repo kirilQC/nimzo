@@ -18,7 +18,7 @@ A personal chess coach. Nimzo pulls finished games from chess.com, analyzes ever
 - [x] **Phase 2: chess.com sync and Session mode.** Serial chess.com client (User-Agent, ETag/Last-Modified, month rollover), 3-month backfill, Recent games, Session mode with 60s polling, auto-off and resume-on-refresh
 - [x] **Phase 3: Engine analysis.** Stockfish 19 lite (WASM, single-threaded, Web Worker) in the browser; Lichess win%, thresholds and accuracy; resumable per-game status; review board, eval graph, move list; auto-analysis of recent games and an "Analyze backlog" queue
 - [x] **Phase 4: Facts, Jev, Maia, patterns.** Deterministic facts + tactical detectors; Maia 3 in the browser (ONNX, no server); Jev via OpenRouter with a Claude fallback; tags with confidence on the review card; Recurring patterns on Home
-- [ ] Phase 5: Claude coaching
+- [x] **Phase 5: Claude coaching.** Move explanations and game summaries (with a move guard), the Home coach's note, session summaries, the illustrated coach and an ElevenLabs voice
 - [ ] Phase 6: Knowledge bank, puzzles, openings, coach chat
 - [ ] Phase 7: Practice mode and polish
 
@@ -45,6 +45,8 @@ npm run dev
 | `CLAUDE_MODEL_COACH` / `CLAUDE_MODEL_REVIEW` | Phase 5 | Default `claude-opus-5-5` |
 | `OPENROUTER_API_KEY` | Phase 4 | Jev is called through OpenRouter's Decisions API (`POST https://openrouter.ai/api/alpha/decisions`) |
 | `JEV_MODEL` | Phase 4 | Default `typesafe/jev-1.13` |
+| `ELEVENLABS_API_KEY` | Phase 5 | Coach voice. Free plan works with premade voices only |
+| `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL` | Phase 5 | Default `pqHfZKP75CvOlQylNhV4` ("Bill") / `eleven_v4` |
 | `VOYAGE_API_KEY` | Phase 6 | Embeddings: `voyage-4`, 1024 dims |
 
 ### Supabase
@@ -89,6 +91,15 @@ npm run dev
 - **Maia 3** runs **in the browser**, not on a server: the official ONNX export from the Maia team (CSSLab/maia-platform-frontend, GPLv3) is served from `app/public/maia/` (45 MB, cached by the browser after the first load) and run with onnxruntime-web on WebAssembly. Rating defaults to 1000 (`nimzo_settings.maia_default_elo`). It yields "about N in 10 players at your level play this move". **No Render service is needed.**
 - **Jev** (`lib/classifier/jev.ts`) is called through OpenRouter's Decisions API (`OPENROUTER_API_KEY`, model `JEV_MODEL`). One request per mistake asks small independent questions: mistake type, phase and root cause as choices, and one yes/no per motif. Yes/no confidence = distance from 50/50. Below `thresholds.jev_min_confidence` (0.6) a label shows as "unclear" and is left out of pattern stats. If Jev errors, Claude (`CLAUDE_MODEL_REVIEW`) classifies with a strict JSON schema, marked `source: "fallback"`. A detector that fires always overrides the classifier, and the deterministic phase wins; the classifier's original answers are kept in `tags.overridden`.
 - Pipeline per game, driven by the browser queue and resumable from the stored status: `imported → engine_done → facts_done → (Maia) → tagged`. `reviewed` comes with Claude coaching in Phase 5.
+
+## Coaching (Phase 5)
+
+- **Game review** (`lib/coach/review.ts`, `POST /api/games/[id]/review`): one Claude call per game (`CLAUDE_MODEL_REVIEW`, structured output) writes a 2–4 sentence explanation per flagged move and a summary (key moment, what went well, one thing to work on). Claude only sees the facts JSON, tags and Maia numbers.
+- **Move guard** (`lib/coach/guard.ts`): every piece move, capture or castle Claude mentions must appear in the engine facts. If not, Nimzo asks once for a rewrite and logs it (`coach.guard` in `nimzo_error_log`).
+- **Coach's note**: regenerated from pattern stats after each analysis batch (`POST /api/coach/note`).
+- **Session summary**: stats are deterministic (W–L, blunders, average accuracy, rating change, blunders by clock bucket); Claude writes the headline, takeaway and the next drill. Written automatically when you open an ended session, with a "Rewrite summary" button.
+- All Claude calls use the server-side refusal fallback (`fallbacks: "default"`), cached system prompts, and `claude-opus-5-5` by default.
+- **Coach character and voice**: an illustrated older club coach (`components/coach/CoachAvatar.tsx`, name in `lib/coach/persona.ts`). Tap "Listen" to hear him (ElevenLabs, `ELEVENLABS_VOICE_ID`). Each distinct text is synthesized once and cached in the private `nimzo-knowledge` storage bucket under `audio/`, so replays cost nothing.
 
 ## Tests
 

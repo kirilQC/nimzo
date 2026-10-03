@@ -17,6 +17,10 @@ const schema = z.object({
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   JEV_MODEL: z.string().default("typesafe/jev-1.13"),
   VOYAGE_API_KEY: z.string().min(1).optional(),
+  // Coach voice (ElevenLabs). Premade voices work on the free plan; library voices need a paid plan.
+  ELEVENLABS_API_KEY: z.string().min(1).optional(),
+  ELEVENLABS_VOICE_ID: z.string().min(1).default("pqHfZKP75CvOlQylNhV4"), // "Bill" (premade)
+  ELEVENLABS_MODEL: z.string().min(1).default("eleven_v4"),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

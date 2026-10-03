@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 
-// Statuses the browser pipeline still has work to do on (tagged/reviewed are done for now).
-const PENDING = ["imported", "engine_done", "facts_done"];
+// Statuses the browser pipeline still has work to do on (only "reviewed" is finished).
+const PENDING = ["imported", "engine_done", "facts_done", "tagged"];
 
 /**
  * Games waiting for the browser pipeline, newest first.

@@ -13,7 +13,7 @@ import { MAIA_MODEL, maiaPredict } from "@/lib/maia/browser";
  */
 
 export type JobState = {
-  state: "queued" | "analyzing" | "saving" | "maia" | "tagging" | "done" | "failed";
+  state: "queued" | "analyzing" | "saving" | "maia" | "tagging" | "coaching" | "done" | "failed";
   progress: number;
   error?: string;
 };
@@ -46,6 +46,7 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
   const [backlog, setBacklog] = useState(0);
   const queueRef = useRef<{ id: string; force: boolean }[]>([]);
   const running = useRef(false);
+  const completedThisRun = useRef(0);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setJob = useCallback((id: string, patch: Partial<JobState>) => {
@@ -80,7 +81,7 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
         if (!res.ok) throw new Error(`Couldn't load game (${res.status})`);
         const game = (await res.json()) as GameInfo;
         let status = next.force ? "imported" : game.analysis_status;
-        if (!["imported", "engine_done", "facts_done"].includes(status)) {
+        if (!["imported", "engine_done", "facts_done", "tagged"].includes(status)) {
           setJob(id, { state: "done", progress: 1 });
           return;
         }
@@ -105,6 +106,7 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
           status = "facts_done";
         }
 
+        if (status === "facts_done") {
         // Maia: how likely a player at your level is to play each flagged move. Best effort.
         setJob(id, { state: "maia", progress: 0.88 });
         try {
@@ -129,8 +131,15 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
           console.warn("[maia] skipped:", (e as Error).message);
         }
 
-        setJob(id, { state: "tagging", progress: 0.94 });
+        setJob(id, { state: "tagging", progress: 0.92 });
         await post(`/api/games/${id}/tag`);
+        status = "tagged";
+        }
+
+        // Claude: explanations for each flagged move and a game summary.
+        setJob(id, { state: "coaching", progress: 0.95 });
+        await post(`/api/games/${id}/review`);
+        completedThisRun.current++;
         setJob(id, { state: "done", progress: 1 });
         setBacklog((b) => Math.max(0, b - 1));
       } catch (e) {
@@ -162,8 +171,13 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
     } finally {
       running.current = false;
       setCurrent(null);
+      // After a batch, refresh the coach's note from the new pattern stats.
+      if (completedThisRun.current > 0) {
+        completedThisRun.current = 0;
+        void fetch("/api/coach/note", { method: "POST" }).then(() => scheduleRefresh()).catch(() => undefined);
+      }
     }
-  }, [analyzeOne]);
+  }, [analyzeOne, scheduleRefresh]);
 
   const enqueue = useCallback<Ctx["enqueue"]>(
     (ids, opts) => {

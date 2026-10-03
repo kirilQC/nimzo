@@ -44,9 +44,13 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
       .select("ply, eval_cp, eval_mate, win_pct, classification, best_move_san, pv_san, multipv, clock_ms")
       .eq("game_id", id)
       .order("ply");
-    const { data: mistakes } = await db.from(T.mistakes).select("ply, tags, maia, explanation").eq("game_id", id);
+    const [{ data: mistakes }, { data: review }] = await Promise.all([
+      db.from(T.mistakes).select("ply, tags, maia, explanation").eq("game_id", id),
+      db.from(T.game_reviews).select("summary").eq("game_id", id).maybeSingle(),
+    ]);
     data = buildReviewData({
       mistakes: (mistakes ?? []) as MistakeRecord[],
+      summary: (review?.summary as ReviewData["summary"]) ?? null,
       gameId: game.id,
       pgn: game.pgn,
       myColor: game.my_color,

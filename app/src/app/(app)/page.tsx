@@ -4,6 +4,8 @@ import { SessionCard } from "@/components/home/SessionCard";
 import { GamesTable } from "@/components/home/GamesTable";
 import { PatternBars } from "@/components/home/PatternBars";
 import { BacklogButton } from "@/components/home/BacklogButton";
+import { CoachAvatar } from "@/components/coach/CoachAvatar";
+import { SpeakButton } from "@/components/coach/SpeakButton";
 import { getPatternStats, getRecentGames, getSettings, needsBackfill } from "@/lib/data";
 import { getOpenSession, getSessionGames } from "@/lib/sessions";
 
@@ -31,9 +33,12 @@ export default async function HomePage() {
       />
 
       <section className="card-dark flex flex-col p-6" aria-labelledby="note-h">
-        <h2 id="note-h" className="eyebrow mb-3">
-          Coach&apos;s note
-        </h2>
+        <div className="mb-3 flex items-center gap-3">
+          <CoachAvatar size={44} />
+          <h2 id="note-h" className="eyebrow">
+            Coach&apos;s note
+          </h2>
+        </div>
         <p className="serif text-[1.3125rem] leading-snug text-panel-text">
           {settings.coach_note ??
             "Play a few games with Session mode on, and I'll tell you the habit that's costing you the most."}
@@ -41,9 +46,12 @@ export default async function HomePage() {
         <p className="mt-3 text-sm text-panel-text-2">
           {settings.coach_note ? `Based on your last ${WINDOW} games.` : "Nothing analyzed yet."}
         </p>
-        <Link href="/learn" className="arrow-link mt-auto pt-4">
-          Drill this in Learn →
-        </Link>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
+          <Link href="/learn" className="arrow-link">
+            Drill this in Learn →
+          </Link>
+          {settings.coach_note && <SpeakButton text={settings.coach_note} />}
+        </div>
       </section>
 
       <section aria-labelledby="recent-h" className="min-w-0">

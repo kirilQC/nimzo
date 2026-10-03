@@ -8,6 +8,9 @@ import { EvalGraph } from "@/components/board/EvalGraph";
 import { SeverityChip, type Severity } from "@/components/ui";
 import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
+import { CoachAvatar } from "@/components/coach/CoachAvatar";
+import { SpeakButton } from "@/components/coach/SpeakButton";
+import { COACH } from "@/lib/coach/persona";
 
 export type ReviewPly = {
   ply: number;
@@ -48,6 +51,7 @@ export type ReviewData = {
   plies: ReviewPly[];
   coach: Record<number, CoachInfo>;
   analyzed: boolean;
+  summary: { key_moment: string; went_well: string; work_on: string } | null;
 };
 
 const SUFFIX: Record<Severity, string> = { blunder: "??", mistake: "?", inaccuracy: "?!" };
@@ -169,6 +173,8 @@ export function GameReview({ data }: { data: ReviewData }) {
       <div className="min-w-0 space-y-4">
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
+        {data.summary && <GameSummaryCard summary={data.summary} />}
+
         <form className="card" onSubmit={(e) => e.preventDefault()}>
           <label htmlFor="ask-game" className="mb-2 block text-sm font-semibold text-ink">
             Ask the coach about this game
@@ -277,7 +283,20 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
           </span>
         )}
       </div>
-      {info?.explanation && <p className="serif mt-3 text-[1.0625rem] leading-relaxed text-ink">{info.explanation}</p>}
+      {info?.explanation && (
+        <div className="mt-3 flex gap-3">
+          <CoachAvatar size={44} />
+          <div className="min-w-0">
+            <p className="serif text-[1.0625rem] leading-relaxed text-ink">{info.explanation}</p>
+            <div className="mt-2">
+              <SpeakButton text={info.explanation} label={`Hear ${COACH.name}`} />
+            </div>
+          </div>
+        </div>
+      )}
+      {data.analyzed && !info?.explanation && data.status !== "reviewed" && (
+        <p className="mt-3 text-sm text-muted">The coach&apos;s explanation is on its way.</p>
+      )}
       {info?.missedMate && <p className="mt-3 text-sm font-semibold text-ink">You had a forced mate here.</p>}
       {info?.bestMoveSan && (
         <p className="mt-3 text-sm text-body2">
@@ -332,6 +351,39 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
           </Link>
         </p>
       )}
+    </section>
+  );
+}
+
+function GameSummaryCard({ summary }: { summary: NonNullable<ReviewData["summary"]> }) {
+  const spoken = `${summary.key_moment} ${summary.went_well} ${summary.work_on}`;
+  return (
+    <section className="card" aria-labelledby="summary-h">
+      <div className="flex items-start gap-3">
+        <CoachAvatar size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="summary-h" className="eyebrow">
+              Game summary
+            </h2>
+            <SpeakButton text={spoken} />
+          </div>
+          <dl className="mt-2 space-y-2 text-[0.9375rem]">
+            <div>
+              <dt className="font-semibold text-ink">Key moment</dt>
+              <dd className="text-body2">{summary.key_moment}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ink">What went well</dt>
+              <dd className="text-body2">{summary.went_well}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ink">Work on</dt>
+              <dd className="text-body2">{summary.work_on}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
     </section>
   );
 }

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { flagsSummary } from "@/components/ui";
 import { ClockBuckets } from "@/components/sessions/ClockBuckets";
+import { SummaryWriter } from "@/components/sessions/SummaryWriter";
+import { CoachAvatar } from "@/components/coach/CoachAvatar";
+import { SpeakButton } from "@/components/coach/SpeakButton";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { formatDate } from "@/lib/format";
@@ -79,7 +82,10 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
 
   return (
     <div>
-      <p className="eyebrow mb-1">{eyebrow}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="eyebrow mb-1">{eyebrow}</p>
+        {id !== "sample" && <SummaryWriter sessionId={id} hasSummary={!!summary.headline} hasGames={games.length > 0} />}
+      </div>
       <h1 className="mb-5 text-[2rem]">{summary.headline ?? "Your session headline appears here once the session ends."}</h1>
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -93,9 +99,15 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
 
       <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
         <section className="card-dark flex flex-col p-6" aria-labelledby="takeaway-h">
-          <h2 id="takeaway-h" className="eyebrow mb-3">
-            Coach&apos;s takeaway
-          </h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <CoachAvatar size={44} />
+              <h2 id="takeaway-h" className="eyebrow">
+                Coach&apos;s takeaway
+              </h2>
+            </div>
+            {summary.takeaway && <SpeakButton text={summary.takeaway} />}
+          </div>
           <p className="serif text-[1.1875rem] leading-relaxed text-panel-text">
             {summary.takeaway ?? "After the session ends, the coach writes a short paragraph here about what decided your games."}
           </p>
