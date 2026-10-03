@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameReview, type ReviewData } from "@/components/review/GameReview";
-import { requireOwner } from "@/lib/auth";
+import { db as getDb } from "@/lib/supabase/admin";
 import { pgnToPositions } from "@/lib/chess/pgn";
 import { SAMPLE_PGN } from "@/lib/chess/sample";
 import { formatDate } from "@/lib/format";
@@ -54,7 +54,7 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
     header = { title: "You (White) vs shilling_fan", meta: ["Sample", "Loss", "10 min rapid", "Italian Game: Blackburne–Shilling Gambit"] };
   } else {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-    const db = await requireOwner();
+    const db = await getDb();
     const { data: game } = await db
       .from("games")
       .select("id, pgn, my_color, opponent, result, time_class, time_control, end_time, eco, opening_name, accuracy_ours")

@@ -43,11 +43,6 @@ export function Nav({ username }: { username: string }) {
           <span>
             chess.com · <span className="text-body2">{username}</span>
           </span>
-          <form action="/auth/signout" method="post">
-            <button type="submit" className="btn btn-ghost min-h-[36px] px-2 text-[0.8125rem] font-normal text-muted">
-              Sign out
-            </button>
-          </form>
         </div>
       </div>
     </header>

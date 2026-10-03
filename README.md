@@ -15,7 +15,7 @@ A personal chess coach. Nimzo pulls finished games from chess.com, analyzes ever
 
 ## Build status
 
-- [x] **Phase 1: Foundation.** Schema and migrations, single-user auth, design tokens, layout, nav and logo, the four screens (matched to the mockups) with empty states
+- [x] **Phase 1: Foundation.** Schema and migrations, no sign-in (server-only database access), design tokens, layout, nav and logo, the four screens (matched to the mockups) with empty states
 - [ ] Phase 2: chess.com sync and Session mode
 - [ ] Phase 3: Stockfish WASM analysis, review board, eval graph
 - [ ] Phase 4: Facts, Jev, Maia, recurring patterns
@@ -41,9 +41,7 @@ npm run dev
 | `CHESSCOM_USERNAME` | Phase 1 | Shown in the nav; used for sync |
 | `CONTACT_EMAIL` | Phase 1 | Goes in the chess.com `User-Agent` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Phase 1 | Supabase → Project Settings → Data API |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Phase 1 | `sb_publishable_…` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works) |
-| `SUPABASE_SECRET_KEY` | Phase 1 | `sb_secret_…`, server only (legacy `SUPABASE_SERVICE_ROLE_KEY` also works) |
-| `ALLOWED_EMAIL` | Phase 1 | The only email that may sign in |
+| `SUPABASE_SECRET_KEY` | Phase 1 | `sb_secret_…`, server only; all database access goes through it (legacy `SUPABASE_SERVICE_ROLE_KEY` also works) |
 | `ANTHROPIC_API_KEY` | Phase 5 | Claude, the coach |
 | `CLAUDE_MODEL_COACH` / `CLAUDE_MODEL_REVIEW` | Phase 5 | Default `claude-opus-5-5` |
 | `OPENROUTER_API_KEY` | Phase 4 | Jev is called through OpenRouter's Decisions API (`POST https://openrouter.ai/api/alpha/decisions`) |
@@ -54,11 +52,8 @@ npm run dev
 ### Supabase
 
 1. Create a project.
-2. Open **SQL Editor**, paste the whole of [`supabase/setup.sql`](supabase/setup.sql) and click **Run**. It creates every table, the RLS policies, the taxonomy seed and the private `knowledge` storage bucket. (It's the migrations in `supabase/migrations/` concatenated; regenerate with `npm --prefix scripts run gen:setup-sql`.)
-3. **Authentication → URL Configuration:** set Site URL to your Vercel URL and add `https://<your-vercel-domain>/auth/callback` and `http://localhost:3000/auth/callback` to Redirect URLs.
-4. **Authentication → Sign In / Providers → Email:** keep it enabled (magic link). After your first sign-in you can turn off "Allow new users to sign up".
-
-**How auth works:** sign-in is by magic link and refused for any email other than `ALLOWED_EMAIL`. On first sign-in, `/auth/callback` writes your user id to `app_owner`. Every table has RLS policies that allow access only when `public.is_owner()` is true, so even a leaked anon key reads nothing.
+2. Open **SQL Editor**, paste the whole of [`supabase/setup.sql`](supabase/setup.sql) and click **Run**. It creates every table (RLS on, no policies), the taxonomy seed and the private `knowledge` storage bucket. (It's the migrations in `supabase/migrations/` concatenated; regenerate with `npm --prefix scripts run gen:setup-sql`.)
+**No sign-in.** Nimzo has no login. The Next.js server talks to Supabase with the secret key; the browser never talks to Supabase directly. RLS is enabled on every table with no policies, so the public key can't read anything. Anyone who has the site URL can use the app, so keep the URL private, or turn on Vercel's Deployment Protection if you want a password in front of it.
 
 ### Taxonomy
 

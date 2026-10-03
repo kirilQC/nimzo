@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { flagsSummary } from "@/components/ui";
 import { ClockBuckets } from "@/components/sessions/ClockBuckets";
-import { requireOwner } from "@/lib/auth";
+import { db as getDb } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Session summary" };
@@ -54,7 +54,7 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
 
   if (id !== "sample") {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-    const db = await requireOwner();
+    const db = await getDb();
     const { data } = await db.from("sessions").select("started_at, ended_at, summary").eq("id", id).maybeSingle();
     if (!data) notFound();
     summary = (data.summary ?? {}) as Summary;

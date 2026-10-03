@@ -1,6 +1,5 @@
 import "server-only";
 import { z } from "zod";
-import { supabasePublishableKey } from "@/lib/supabase/keys";
 
 /**
  * Server-side environment. Parsed lazily so `next build` works without every
@@ -10,9 +9,7 @@ const schema = z.object({
   CHESSCOM_USERNAME: z.string().min(1),
   CONTACT_EMAIL: z.string().email(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   SUPABASE_SECRET_KEY: z.string().min(1),
-  ALLOWED_EMAIL: z.string().email(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   CLAUDE_MODEL_COACH: z.string().default("claude-opus-5-5"),
   CLAUDE_MODEL_REVIEW: z.string().default("claude-opus-5-5"),
@@ -32,8 +29,7 @@ export function env(): ServerEnv {
   if (cached) return cached;
   const parsed = schema.safeParse({
     ...process.env,
-    // Accept Supabase's legacy key names too.
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabasePublishableKey(),
+    // Accept Supabase's legacy key name too.
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY,
   });
   if (!parsed.success) {
@@ -42,8 +38,4 @@ export function env(): ServerEnv {
   }
   cached = parsed.data;
   return cached;
-}
-
-export function sameEmail(a: string | null | undefined, b: string | null | undefined): boolean {
-  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 }

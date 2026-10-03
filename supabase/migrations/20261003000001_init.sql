@@ -1,29 +1,10 @@
 -- Nimzo initial schema.
--- Single-user app: every table is gated by RLS through public.is_owner(),
--- which checks the signed-in user against the one row in public.app_owner.
+-- No sign-in: the Next.js server reads and writes with the Supabase secret key,
+-- which bypasses RLS. RLS is enabled on every table with no policies, so the
+-- public (publishable/anon) key can't read or write anything.
 
 create extension if not exists vector with schema extensions;
 create extension if not exists pgcrypto with schema extensions;
-
--- ---------------------------------------------------------------------------
--- Ownership
--- ---------------------------------------------------------------------------
-create table public.app_owner (
-  id boolean primary key default true check (id), -- at most one row
-  user_id uuid not null unique references auth.users (id) on delete cascade,
-  email text not null,
-  created_at timestamptz not null default now()
-);
-
-create or replace function public.is_owner()
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (select 1 from public.app_owner o where o.user_id = (select auth.uid()));
-$$;
 
 -- ---------------------------------------------------------------------------
 -- Taxonomy (seeded from app/src/lib/taxonomy.ts, see next migration)
@@ -339,32 +320,23 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- RLS: owner-only on every table
+-- RLS on, no policies: only the server's secret key can access these tables.
 -- ---------------------------------------------------------------------------
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'app_owner', 'taxonomy_tags', 'openings', 'settings', 'chesscom_archives', 'sessions',
+    'taxonomy_tags', 'openings', 'settings', 'chesscom_archives', 'sessions',
     'games', 'positions', 'mistakes', 'game_reviews', 'knowledge_documents', 'lessons',
     'lesson_chunks', 'puzzles', 'puzzle_attempts', 'chat_threads', 'chat_messages', 'error_log'
   ] loop
     execute format('alter table public.%I enable row level security', t);
-    execute format(
-      'create policy owner_all on public.%I for all to authenticated using ((select public.is_owner())) with check ((select public.is_owner()))',
-      t
-    );
   end loop;
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Storage bucket for the knowledge PDF (private)
+-- Private storage bucket for the knowledge PDF (server uploads with the secret key)
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('knowledge', 'knowledge', false)
 on conflict (id) do nothing;
-
-create policy knowledge_owner_all on storage.objects
-  for all to authenticated
-  using (bucket_id = 'knowledge' and (select public.is_owner()))
-  with check (bucket_id = 'knowledge' and (select public.is_owner()));
