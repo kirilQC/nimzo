@@ -1,0 +1,16 @@
+// Sample game for the layout preview at /games/sample (same as __fixtures__/blunder.pgn).
+export const SAMPLE_PGN = `[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.09.20"]
+[Round "-"]
+[White "NimzoUser"]
+[Black "shilling_fan"]
+[Result "0-1"]
+[WhiteElo "1180"]
+[BlackElo "1205"]
+[ECO "C50"]
+[TimeControl "600"]
+[Termination "shilling_fan won by checkmate"]
+
+1. e4 {[%clk 0:09:57.0]} e5 {[%clk 0:09:58.0]} 2. Nf3 {[%clk 0:09:53.0]} Nc6 {[%clk 0:09:55.0]} 3. Bc4 {[%clk 0:09:47.0]} Nd4 {[%clk 0:09:50.0]} 4. Nxe5 {[%clk 0:09:38.0]} Qg5 {[%clk 0:09:38.0]} 5. Nxf7 {[%clk 0:09:24.0]} Qxg2 {[%clk 0:09:30.0]} 6. Rf1 {[%clk 0:09:17.0]} Qxe4+ {[%clk 0:09:26.0]} 7. Be2 {[%clk 0:09:06.0]} Nf3# {[%clk 0:09:21.0]} 0-1
+`;

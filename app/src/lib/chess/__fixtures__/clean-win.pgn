@@ -1,0 +1,14 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.09.28"]
+[Round "-"]
+[White "NimzoUser"]
+[Black "duke_karl"]
+[Result "1-0"]
+[WhiteElo "1228"]
+[BlackElo "1251"]
+[ECO "C41"]
+[TimeControl "600"]
+[Termination "NimzoUser won by checkmate"]
+
+1. e4 {[%clk 0:09:56.0]} e5 {[%clk 0:09:42.0]} 2. Nf3 {[%clk 0:09:41.0]} d6 {[%clk 0:09:30.0]} 3. d4 {[%clk 0:09:32.0]} Bg4 {[%clk 0:09:24.0]} 4. dxe5 {[%clk 0:09:12.0]} Bxf3 {[%clk 0:09:07.0]} 5. Qxf3 {[%clk 0:08:58.0]} dxe5 {[%clk 0:08:56.0]} 6. Bc4 {[%clk 0:08:50.0]} Nf6 {[%clk 0:08:51.0]} 7. Qb3 {[%clk 0:08:31.0]} Qe7 {[%clk 0:08:35.0]} 8. Nc3 {[%clk 0:08:18.0]} c6 {[%clk 0:08:25.0]} 9. Bg5 {[%clk 0:08:11.0]} b5 {[%clk 0:08:21.0]} 10. Nxb5 {[%clk 0:07:53.0]} cxb5 {[%clk 0:08:06.0]} 11. Bxb5+ {[%clk 0:07:41.0]} Nbd7 {[%clk 0:07:57.0]} 12. O-O-O {[%clk 0:07:35.0]} Rd8 {[%clk 0:07:37.0]} 13. Rxd7 {[%clk 0:07:18.0]} Rxd7 {[%clk 0:07:23.0]} 14. Rd1 {[%clk 0:07:07.0]} Qe6 {[%clk 0:07:15.0]} 15. Bxd7+ {[%clk 0:07:02.0]} Nxd7 {[%clk 0:06:56.0]} 16. Qb8+ {[%clk 0:06:46.0]} Nxb8 {[%clk 0:06:43.0]} 17. Rd8# {[%clk 0:06:36.0]} 1-0

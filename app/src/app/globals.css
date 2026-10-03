@@ -1,0 +1,280 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Nimzo design tokens. Warm and classic: parchment, walnut, brass.
+   Light-only by design (the brief specifies one palette).
+   --------------------------------------------------------------------------- */
+:root {
+  --parchment: #f5efe3;
+  --card: #fbf8f1;
+  --border: #dccfb8;
+  --border-soft: #e5dac6;
+  --chip: #eadfcb;
+
+  --ink: #2a231b;
+  --muted: #6b5d4b;
+  --body-2: #4e4335;
+
+  --walnut: #5c3d24;
+  --walnut-hover: #4a3019;
+  --brass: #c9a063;
+  --panel: #2a231b;
+  --panel-text: #f5efe3;
+  --panel-text-2: #d9c7a6;
+
+  --sq-light: #ead7b5;
+  --sq-dark: #a9784f;
+  --hl-light: #e3b66a;
+  --hl-dark: #c08a3e;
+
+  --blunder-bg: #9e2b25;
+  --blunder-fg: #ffffff;
+  --mistake-bg: #f2c9a0;
+  --mistake-fg: #6e340c;
+  --inacc-bg: #f0dfb0;
+  --inacc-fg: #5e4508;
+  --win: #3d6b35;
+  --loss: #9e2b25;
+
+  --r-card: 10px;
+  --r-btn: 8px;
+  --r-chip: 6px;
+
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-parchment: var(--parchment);
+  --color-card: var(--card);
+  --color-line: var(--border);
+  --color-line-soft: var(--border-soft);
+  --color-chip: var(--chip);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-body2: var(--body-2);
+  --color-walnut: var(--walnut);
+  --color-brass: var(--brass);
+  --color-panel: var(--panel);
+  --color-panel-text: var(--panel-text);
+  --color-panel-text-2: var(--panel-text-2);
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-source-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+@layer base {
+html {
+  background: var(--parchment);
+}
+body {
+  background: var(--parchment);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+h1 { font-size: 1.875rem; line-height: 1.2; }
+h2 { font-size: 1.25rem; line-height: 1.3; }
+h3 { font-size: 1.0625rem; line-height: 1.35; }
+
+.mono { font-family: var(--font-mono); font-weight: 500; font-feature-settings: "tnum"; }
+
+a { color: inherit; }
+.link {
+  color: var(--walnut);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--brass);
+  text-underline-offset: 3px;
+}
+.link:hover { text-decoration-color: var(--walnut); }
+
+:focus-visible {
+  outline: 2px solid var(--walnut);
+  outline-offset: 2px;
+}
+
+}
+
+@layer components {
+/* Cards ------------------------------------------------------------------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 1.25rem;
+}
+.card-dark {
+  background: var(--panel);
+  color: var(--panel-text);
+  border-radius: var(--r-card);
+  padding: 1.25rem;
+}
+.card-dark h2, .card-dark h3 { color: var(--panel-text); }
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-dark .eyebrow { color: var(--brass); }
+
+/* Buttons ----------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.125rem;
+  border-radius: var(--r-btn);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--walnut); color: var(--card); }
+.btn-primary:hover:not(:disabled) { background: var(--walnut-hover); }
+.btn-secondary { background: var(--card); color: var(--walnut); border-color: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--chip); }
+.btn-ghost { background: transparent; color: var(--walnut); }
+.btn-ghost:hover:not(:disabled) { background: var(--chip); }
+.btn-icon { width: 44px; padding: 0; }
+.card-dark .btn-secondary { background: transparent; color: var(--panel-text); border-color: #5a4c3a; }
+
+/* Chips ------------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--r-chip);
+  background: var(--chip);
+  color: var(--body-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.chip-blunder { background: var(--blunder-bg); color: var(--blunder-fg); }
+.chip-mistake { background: var(--mistake-bg); color: var(--mistake-fg); }
+.chip-inaccuracy { background: var(--inacc-bg); color: var(--inacc-fg); }
+.chip-outline { background: transparent; border: 1px solid var(--border); }
+
+/* Tables ------------------------------------------------------------------ */
+.table-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+.table th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+.table tr:last-child td { border-bottom: 0; }
+
+/* Forms ------------------------------------------------------------------- */
+.input {
+  min-height: 44px;
+  width: 100%;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+.input::placeholder { color: var(--muted); }
+.select {
+  min-height: 44px;
+  padding: 0 2rem 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+
+/* Session toggle ---------------------------------------------------------- */
+.toggle {
+  position: relative;
+  width: 76px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--chip);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms ease;
+}
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: transform 150ms ease;
+}
+.toggle[aria-checked="true"] { background: var(--walnut); border-color: var(--walnut); }
+.toggle[aria-checked="true"]::after { transform: translateX(32px); border-color: var(--walnut); }
+.toggle:disabled { opacity: 0.6; cursor: progress; }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle, .toggle::after { transition: none; }
+}
+
+@layer components {
+  .section-title {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.375rem;
+    line-height: 1.3;
+    color: var(--ink);
+    margin-bottom: 0.75rem;
+  }
+  .arrow-link {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--brass);
+    text-underline-offset: 3px;
+  }
+  .card-dark .arrow-link { color: var(--panel-text); }
+  .btn-sm { min-height: 36px; padding: 0 0.875rem; font-size: 0.875rem; }
+  .btn-light { background: var(--card); color: var(--ink); border-color: var(--border); }
+  .btn-light:hover:not(:disabled) { background: var(--chip); }
+  .row-tint { background: #f3e6d4; }
+}
