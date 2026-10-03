@@ -9,15 +9,20 @@ import { logError } from "@/lib/log";
 
 export const maxDuration = 60;
 
-const body = z.object({ sessionId: z.string().uuid().nullish() }).default({});
+const body = z
+  .object({
+    sessionId: z.string().uuid().nullish(),
+    history: z.object({ months: z.union([z.number().int().min(1).max(240), z.literal("all")]), chunk: z.number().int().min(1).max(12).optional() }).optional(),
+  })
+  .default({});
 
 export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "bad request" }, { status: 400 });
-  const { sessionId } = parsed.data;
+  const { sessionId, history } = parsed.data;
 
   try {
-    const result = await syncChesscom({ sessionId });
+    const result = await syncChesscom({ sessionId, history });
     const sessionGames = sessionId ? await getSessionGames(sessionId) : undefined;
     return NextResponse.json({ ...result, sessionGames });
   } catch (e) {

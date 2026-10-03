@@ -6,6 +6,7 @@ import { logError } from "@/lib/log";
 import { chesscom, monthArchiveUrl } from "./client";
 import {
   addMonths,
+  archiveComplete,
   backfillArchives,
   mapGame,
   monthsToCheck,
@@ -22,7 +23,9 @@ import {
 const RATINGS_TTL_MS = 60 * 60 * 1000;
 
 export type SyncResult = {
-  mode: "backfill" | "incremental";
+  mode: "backfill" | "incremental" | "history";
+  /** History import only: older months still to fetch after this call. */
+  remaining?: number;
   checked: string[];
   notModified: string[];
   imported: number;
@@ -33,7 +36,13 @@ export type SyncResult = {
 
 type ArchiveRow = { url: string; etag: string | null; last_modified: string | null; last_checked_at: string | null };
 
-export async function syncChesscom(opts: { sessionId?: string | null } = {}): Promise<SyncResult> {
+export async function syncChesscom(
+  opts: {
+    sessionId?: string | null;
+    /** Import older games: the last N months, or "all". Done in chunks of `chunk` archives per call. */
+    history?: { months: number | "all"; chunk?: number };
+  } = {},
+): Promise<SyncResult> {
   const db = await getDb();
   const username = env().CHESSCOM_USERNAME;
   const now = new Date();
@@ -50,7 +59,19 @@ export async function syncChesscom(opts: { sessionId?: string | null } = {}): Pr
   // First run: no archive has ever been checked -> backfill the last N months.
   let targets: string[];
   let mode: SyncResult["mode"];
-  if (known.size === 0) {
+  let remaining: number | undefined;
+  if (opts.history) {
+    mode = "history";
+    const list = await chesscom.archives();
+    const all = list.status === "ok" ? list.data.archives : [];
+    const wanted = opts.history.months === "all" ? all : backfillArchives(all, now, opts.history.months);
+    // Newest first, skipping months already fully imported.
+    const currentUrl = monthArchiveUrl(utcYearMonth(now).year, utcYearMonth(now).month);
+    // The current month is the regular sync's job; history only fills in finished months.
+    const todo = wanted.filter((u) => u.toLowerCase() !== currentUrl.toLowerCase() && !archiveComplete(u, known.get(u)?.last_checked_at)).reverse();
+    targets = todo.slice(0, opts.history.chunk ?? 4);
+    remaining = Math.max(0, todo.length - targets.length);
+  } else if (known.size === 0) {
     mode = "backfill";
     const list = await chesscom.archives();
     const all = list.status === "ok" ? list.data.archives : [];
@@ -62,7 +83,7 @@ export async function syncChesscom(opts: { sessionId?: string | null } = {}): Pr
     targets = monthsToCheck(now, prevChecked ? new Date(prevChecked) : null).map((ym) => monthArchiveUrl(ym.year, ym.month));
   }
 
-  const result: SyncResult = { mode, checked: [], notModified: [], imported: 0, skipped: 0, newGameIds: [], latestGameId: null };
+  const result: SyncResult = { mode, remaining, checked: [], notModified: [], imported: 0, skipped: 0, newGameIds: [], latestGameId: null };
 
   for (const url of targets) {
     const prev = known.get(url);

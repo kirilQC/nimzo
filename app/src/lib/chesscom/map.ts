@@ -186,3 +186,11 @@ export function ratingsFromStats(stats: ChesscomStats): Record<string, number> {
   }
   return out;
 }
+
+/** A past month's archive is complete once it was checked after that month ended. */
+export function archiveComplete(url: string, lastChecked: string | null | undefined): boolean {
+  const ym = parseArchiveUrl(url);
+  if (!ym || !lastChecked) return false;
+  const end = new Date(Date.UTC(ym.year, ym.month, 1)); // first instant of the next month
+  return new Date(lastChecked) >= end;
+}

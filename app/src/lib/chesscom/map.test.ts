@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   addMonths,
+  archiveComplete,
   backfillArchives,
   mapGame,
   monthsToCheck,
@@ -146,5 +147,14 @@ describe("ratingsFromStats", () => {
     expect(
       ratingsFromStats({ chess_rapid: { last: { rating: 468, date: 1 } }, chess_blitz: { last: { rating: 217, date: 1 } } }),
     ).toEqual({ rapid: 468, blitz: 217 });
+  });
+});
+
+describe("history import", () => {
+  const u = "https://api.chess.com/pub/player/kivlev3000/games/2026/09";
+  it("treats a month as complete only if checked after it ended", () => {
+    expect(archiveComplete(u, "2026-10-01T00:00:01Z")).toBe(true);
+    expect(archiveComplete(u, "2026-09-30T23:59:00Z")).toBe(false);
+    expect(archiveComplete(u, null)).toBe(false);
   });
 });

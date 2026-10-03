@@ -9,6 +9,7 @@ import { SeverityChip, type Severity } from "@/components/ui";
 import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { ArthurPanel } from "@/components/coach/ArthurPanel";
+import { expressionForGame, expressionForMistake } from "@/lib/coach/expressions";
 
 export type ReviewPly = {
   ply: number;
@@ -50,6 +51,8 @@ export type ReviewData = {
   coach: Record<number, CoachInfo>;
   analyzed: boolean;
   summary: { key_moment: string; went_well: string; work_on: string } | null;
+  result: "win" | "loss" | "draw" | null;
+  accuracy: number | null;
 };
 
 const SUFFIX: Record<Severity, string> = { blunder: "??", mistake: "?", inaccuracy: "?!" };
@@ -69,7 +72,14 @@ export function GameReview({ data }: { data: ReviewData }) {
     (ply: number) => {
       const next = Math.max(0, Math.min(plies.length, ply));
       setCurrent(next);
-      listRef.current?.querySelector(`[data-ply="${next}"]`)?.scrollIntoView({ block: "nearest" });
+      // Keep the selected move visible by scrolling the move list itself, never the page.
+      const list = listRef.current;
+      const row = list?.querySelector<HTMLElement>(`[data-ply="${next}"]`)?.closest("li");
+      if (list && row) {
+        const top = row.offsetTop - list.offsetTop;
+        if (top < list.scrollTop) list.scrollTop = top;
+        else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + row.offsetHeight - list.clientHeight;
+      }
     },
     [plies.length],
   );
@@ -172,8 +182,25 @@ export function GameReview({ data }: { data: ReviewData }) {
       <div className="min-w-0 space-y-4">
         <ArthurPanel
           gameId={data.gameId}
-          opening={data.summary ? `${data.summary.key_moment} ${data.summary.work_on}` : null}
-          focus={selectedCoach?.explanation ?? null}
+          opening={
+            data.summary
+              ? { text: `${data.summary.key_moment} ${data.summary.work_on}`, expression: expressionForGame(data.result, data.accuracy) }
+              : null
+          }
+          focus={
+            pos && pos.severity && selectedCoach?.explanation
+              ? {
+                  text: selectedCoach.explanation,
+                  expression: expressionForMistake({
+                    severity: pos.severity,
+                    ply: pos.ply,
+                    clockMs: pos.clockMs,
+                    missedMate: selectedCoach.missedMate,
+                    winBefore: moverWinBefore(plies, pos),
+                  }),
+                }
+              : null
+          }
           ply={current}
           placeholder={
             !data.analyzed
@@ -337,6 +364,13 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
       )}
     </section>
   );
+}
+
+/** The mover's win% in the position before this move (from stored White win%). */
+function moverWinBefore(plies: ReviewPly[], p: ReviewPly): number | null {
+  const prev = p.ply > 1 ? plies[p.ply - 2]?.whitePct : 50;
+  if (prev === null || prev === undefined) return null;
+  return p.color === "w" ? prev : 100 - prev;
 }
 
 function NavIcon({ d }: { d: string }) {

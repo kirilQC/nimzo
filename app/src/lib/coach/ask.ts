@@ -11,11 +11,12 @@ import type { MoveFacts } from "@/lib/analysis/facts";
 import { structuredCall } from "./claude";
 import { COACH_VOICE, GAME_QA_TASK } from "./prompts";
 import { sanSet, unknownMoves } from "./guard";
+import { EXPRESSIONS, QA_EXPRESSIONS, type Expression } from "./expressions";
 
 type PositionRow = { ply: number; san: string | null; eval_cp: number | null; eval_mate: number | null; best_move_san: string | null; pv_san: string[] | null; classification: string | null };
 
 /** Answers a question about one game, grounded in its stored engine data. Persists the thread. */
-export async function askAboutGame(gameId: string, question: string, ply: number): Promise<{ answer: string; threadId: string }> {
+export async function askAboutGame(gameId: string, question: string, ply: number): Promise<{ answer: string; expression: Expression; threadId: string }> {
   const db = await getDb();
   const [{ data: game }, { data: positions }, { data: mistakes }, { data: review }] = await Promise.all([
     db.from(T.games).select("pgn, my_color, opponent, result, opening_name, accuracy_ours").eq("id", gameId).single(),
@@ -85,12 +86,16 @@ export async function askAboutGame(gameId: string, question: string, ply: number
     }),
   ]);
 
-  const system = `${COACH_VOICE}\n\n${GAME_QA_TASK}`;
+  const faces = QA_EXPRESSIONS.map((e) => `- ${e}: ${EXPRESSIONS[e]}`).join("\n");
+  const system = `${COACH_VOICE}\n\n${GAME_QA_TASK}\n\nAlso choose the facial expression you'd naturally have while saying your answer:\n${faces}`;
+  const schema = z.object({ answer: z.string(), expression: z.enum(QA_EXPRESSIONS as [Expression, ...Expression[]]) });
   let user = JSON.stringify(context);
   let answer = "";
+  let expression: Expression = "explaining";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { data } = await structuredCall({ model: env().CLAUDE_MODEL_COACH, system, user, schema: z.object({ answer: z.string() }), effort: "medium", maxTokens: 4000 });
+    const { data } = await structuredCall({ model: env().CLAUDE_MODEL_COACH, system, user, schema, effort: "medium", maxTokens: 4000 });
     answer = data.answer.trim();
+    expression = data.expression;
     const bad = unknownMoves(answer, allowed);
     if (!bad.length) break;
     await logError("coach.guard", new Error("answer mentioned moves not in data"), { bad, attempt }, gameId);
@@ -99,8 +104,8 @@ export async function askAboutGame(gameId: string, question: string, ply: number
 
   await db.from(T.chat_messages).insert([
     { thread_id: thread.id, role: "user", content: { text: question, ply } },
-    { thread_id: thread.id, role: "assistant", content: { text: answer }, model: env().CLAUDE_MODEL_COACH },
+    { thread_id: thread.id, role: "assistant", content: { text: answer, expression }, model: env().CLAUDE_MODEL_COACH },
   ]);
   await db.from(T.chat_threads).update({ updated_at: new Date().toISOString() }).eq("id", thread.id);
-  return { answer, threadId: thread.id };
+  return { answer, expression, threadId: thread.id };
 }

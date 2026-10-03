@@ -51,6 +51,8 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
     data = buildReviewData({
       mistakes: (mistakes ?? []) as MistakeRecord[],
       summary: (review?.summary as ReviewData["summary"]) ?? null,
+      result: game.result as ReviewData["result"],
+      accuracy: game.accuracy_ours === null ? null : Number(game.accuracy_ours),
       gameId: game.id,
       pgn: game.pgn,
       myColor: game.my_color,

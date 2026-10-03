@@ -3,13 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useVoice } from "./VoiceProvider";
 import { COACH } from "@/lib/coach/persona";
+import { EXPRESSIONS, expressionSrc, type Expression } from "@/lib/coach/expressions";
 
-export type ArthurLine = { who: "arthur" | "you"; text: string };
+export type ArthurSay = { text: string; expression: Expression };
+type Line = { who: "arthur" | "you"; text: string; expression?: Expression };
+
+const SETTLE_MS = 8_000; // back to a warm smile after talking
+const SLEEPY_MS = 4 * 60_000; // nods off if you've been away a while
 
 /**
- * Arthur's corner of the review page: his portrait, what he's saying now, and
- * the back-and-forth. He opens with the game summary, explains each flagged
- * move as you step to it, and answers questions about the game out loud.
+ * Arthur's corner of the review page: his portrait (whose expression follows
+ * the moment), what he's saying now, and the back-and-forth. He opens with the
+ * game summary, explains each flagged move as you step to it, and answers
+ * questions about the game out loud.
  */
 export function ArthurPanel({
   gameId,
@@ -19,42 +25,69 @@ export function ArthurPanel({
   placeholder,
 }: {
   gameId: string | null;
-  opening: string | null; // first thing Arthur says (game summary)
-  focus: string | null; // explanation of the flagged move you're looking at
+  opening: ArthurSay | null; // first thing Arthur says (game summary)
+  focus: ArthurSay | null; // explanation of the flagged move you're looking at
   ply: number;
   placeholder: string;
 }) {
   const { speak, speaking, current, muted } = useVoice();
-  const [lines, setLines] = useState<ArthurLine[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [question, setQuestion] = useState("");
+  const [typing, setTyping] = useState(false);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [face, setFace] = useState<Expression>(opening ? "cap_tip" : "warm_smile");
+  const [activity, setActivity] = useState(0);
   const said = useRef(new Set<string>());
   const threadRef = useRef<HTMLOListElement>(null);
 
-  const say = (text: string, interrupt: boolean) => {
-    if (!said.current.has(text)) {
-      said.current.add(text);
-      setLines((l) => [...l, { who: "arthur", text }]);
+  const say = (s: ArthurSay, interrupt: boolean) => {
+    if (!said.current.has(s.text)) {
+      said.current.add(s.text);
+      setLines((l) => [...l, { who: "arthur", text: s.text, expression: s.expression }]);
     }
-    speak(text, { interrupt });
+    setFace(s.expression);
+    setActivity((n) => n + 1);
+    speak(s.text, { interrupt });
   };
 
-  // Opening: the game summary, once.
+  // Preload every expression so switching never flickers.
   useEffect(() => {
-    // Interrupt whatever Arthur was saying on the previous page.
+    for (const e of Object.keys(EXPRESSIONS)) {
+      const img = new Image();
+      img.src = expressionSrc(e as Expression);
+    }
+  }, []);
+
+  // Arthur reacting to what's on screen is a side effect (speech + face), so it lives in effects.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // Opening: the game summary, once (interrupting whatever was said on the previous page).
+  useEffect(() => {
     if (opening) say(opening, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opening]);
+  }, [opening?.text]);
 
-  // Stepping onto a flagged move: Arthur explains it.
+  // Stepping onto a flagged move: Arthur reacts and explains it.
   useEffect(() => {
     if (focus) say(focus, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus]);
+  }, [focus?.text]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Settle back to a smile when the talking stops; nod off if nothing happens for a while.
+  useEffect(() => {
+    if (speaking || asking || typing) return;
+    const settle = setTimeout(() => setFace("warm_smile"), SETTLE_MS);
+    const sleepy = setTimeout(() => setFace("sleepy"), SLEEPY_MS);
+    return () => {
+      clearTimeout(settle);
+      clearTimeout(sleepy);
+    };
+  }, [speaking, asking, typing, activity]);
 
   useEffect(() => {
-    threadRef.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
+    const el = threadRef.current; // scroll the conversation box only, never the page
+    if (el) el.scrollTop = el.scrollHeight;
   }, [lines]);
 
   async function ask(e: React.FormEvent) {
@@ -62,6 +95,7 @@ export function ArthurPanel({
     const q = question.trim();
     if (!q || !gameId) return;
     setQuestion("");
+    setTyping(false);
     setError(null);
     setLines((l) => [...l, { who: "you", text: q }]);
     setAsking(true);
@@ -71,25 +105,35 @@ export function ArthurPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q, ply }),
       });
-      const json = (await res.json().catch(() => ({}))) as { answer?: string; error?: string };
+      const json = (await res.json().catch(() => ({}))) as { answer?: string; expression?: Expression; error?: string };
       if (!res.ok || !json.answer) throw new Error(json.error ?? "Arthur couldn't answer that just now.");
-      say(json.answer, true);
+      say({ text: json.answer, expression: json.expression && json.expression in EXPRESSIONS ? json.expression : "explaining" }, true);
     } catch (err) {
       setError((err as Error).message);
+      setFace("shrug");
     } finally {
       setAsking(false);
     }
   }
 
-  const mine = new Set(lines.filter((l) => l.who === "arthur").map((l) => l.text));
-  const sayingHere = !!current && mine.has(current);
+  const arthurLines = lines.filter((l) => l.who === "arthur");
+  const speakingLine = current ? arthurLines.find((l) => l.text === current) : undefined;
+  const sayingHere = !!speakingLine;
+  const shown: Expression = asking ? "thinking" : typing && question.trim() ? "listening" : (speakingLine?.expression ?? face);
 
   return (
     <section className="card p-0" aria-labelledby="arthur-h">
       <div className="flex gap-4 p-4">
         <div className={`relative w-[150px] shrink-0 self-start overflow-hidden rounded-[10px] border-2 border-brass ${speaking && sayingHere ? "arthur-speaking" : ""}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/arthur-panel.webp" alt={`${COACH.name}, your coach`} width={150} height={188} className="block h-[188px] w-full object-cover" />
+          <img
+            key={shown}
+            src={expressionSrc(shown)}
+            alt={`${COACH.name}: ${EXPRESSIONS[shown]}`}
+            width={150}
+            height={188}
+            className="arthur-face block h-[188px] w-full object-cover"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -110,7 +154,7 @@ export function ArthurPanel({
             ) : null}
           </div>
           <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
-            {(sayingHere ? current : null) ?? lines.filter((l) => l.who === "arthur").at(-1)?.text ?? placeholder}
+            {speakingLine?.text ?? arthurLines.at(-1)?.text ?? placeholder}
           </p>
         </div>
       </div>
@@ -135,7 +179,12 @@ export function ArthurPanel({
           id="ask-arthur"
           className="input"
           value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          onChange={(e) => {
+            setQuestion(e.target.value);
+            setTyping(true);
+            setActivity((n) => n + 1);
+          }}
+          onBlur={() => setTyping(false)}
           placeholder={gameId ? `Ask ${COACH.name} about this game` : "Available on your own games"}
           disabled={!gameId || asking}
         />

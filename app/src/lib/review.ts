@@ -73,6 +73,8 @@ export function buildReviewData(args: {
   mistakes?: MistakeRecord[];
   minConfidence?: number;
   summary?: ReviewData["summary"];
+  result?: ReviewData["result"];
+  accuracy?: number | null;
 }): ReviewData {
   const mistakeByPly = new Map((args.mistakes ?? []).map((m) => [m.ply, m]));
   const parsed = pgnToPositions(args.pgn);
@@ -135,6 +137,8 @@ export function buildReviewData(args: {
     myColor: args.myColor,
     analyzed,
     summary: args.summary ?? null,
+    result: args.result ?? null,
+    accuracy: args.accuracy ?? null,
     coach,
     plies,
   };
