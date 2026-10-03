@@ -16,7 +16,7 @@ A personal chess coach. Nimzo pulls finished games from chess.com, analyzes ever
 ## Build status
 
 - [x] **Phase 1: Foundation.** Schema and migrations, no sign-in (server-only database access), design tokens, layout, nav and logo, the four screens (matched to the mockups) with empty states
-- [ ] Phase 2: chess.com sync and Session mode
+- [x] **Phase 2: chess.com sync and Session mode.** Serial chess.com client (User-Agent, ETag/Last-Modified, month rollover), 3-month backfill, Recent games, Session mode with 60s polling, auto-off and resume-on-refresh
 - [ ] Phase 3: Stockfish WASM analysis, review board, eval graph
 - [ ] Phase 4: Facts, Jev, Maia, recurring patterns
 - [ ] Phase 5: Claude coaching
@@ -62,6 +62,19 @@ npm run dev
 ### Icons
 
 `npm run gen:icons` (from `app/`) exports the favicon set (`favicon.ico`, `icon.svg`, `apple-icon.png`, 32/192/512 PNGs), the logo with the arched text converted to outlines, and the OG image, all from `app/src/lib/brand.ts`.
+
+## How sync and Session mode work
+
+**Fair play:** Nimzo only reads *finished* games from chess.com's public monthly archives (`/pub/player/{user}/games/{YYYY}/{MM}`). It never reads a live board or gives feedback during a chess.com game.
+
+- **First visit:** Home imports the last `backfill_months` (default 3) of games from the archive list. Months with no games are skipped.
+- **Every sync** (`POST /api/sync`) checks the current month's archive with `If-None-Match` / `If-Modified-Since`, so an unchanged archive costs one 304. Last month is also checked during the first 3 days of a month, or if it was never checked after it ended. Requests to chess.com are strictly serial.
+- **Dedupe** is on the chess.com game `uuid`, falling back to its URL. Only `rules === "chess"` is imported; every time class is stored, and lists default to rapid and blitz.
+- **Session mode on:** creates a `nimzo_sessions` row, pings the Render engine's `/health` (when `ENGINE_URL` is set), then polls `/api/sync` every 60 s while the tab is open. Games that end after the session started are attached to it and listed under "This session".
+- **Off:** the toggle ends the session; "End session & summarize" ends it and opens its summary page (the written summary arrives in Phase 5). It turns itself off after `session_auto_off_minutes` (default 60) without a new game.
+- **Closed tab = off.** The row stays open so it can still be ended and summarized on your next visit. A refresh within ~2.5 minutes resumes the session instead.
+- **Analyze my last game** syncs, then opens your most recent game.
+- Ratings from `/stats` are refreshed at most hourly into `nimzo_settings.ratings`.
 
 ## Tests
 

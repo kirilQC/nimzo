@@ -3,17 +3,31 @@ import { EmptyState } from "@/components/ui";
 import { SessionCard } from "@/components/home/SessionCard";
 import { GamesTable } from "@/components/home/GamesTable";
 import { PatternBars } from "@/components/home/PatternBars";
-import { getPatternStats, getRecentGames, getSettings } from "@/lib/data";
+import { getPatternStats, getRecentGames, getSettings, needsBackfill } from "@/lib/data";
+import { getOpenSession, getSessionGames } from "@/lib/sessions";
 
 const WINDOW = 30;
 
 export default async function HomePage() {
-  const [games, stats, settings] = await Promise.all([getRecentGames(10), getPatternStats(WINDOW), getSettings()]);
+  const [games, stats, settings, backfill, openSession] = await Promise.all([
+    getRecentGames(10),
+    getPatternStats(WINDOW),
+    getSettings(),
+    needsBackfill(),
+    getOpenSession(),
+  ]);
+  const openSessionGames = openSession ? await getSessionGames(openSession.id) : [];
   const topStats = stats.slice(0, 5);
 
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1fr)_330px]">
-      <SessionCard />
+      <SessionCard
+        openSession={openSession}
+        openSessionGames={openSessionGames}
+        needsBackfill={backfill}
+        autoOffMinutes={settings.session_auto_off_minutes ?? 60}
+        backfillMonths={settings.backfill_months ?? 3}
+      />
 
       <section className="card-dark flex flex-col p-6" aria-labelledby="note-h">
         <h2 id="note-h" className="eyebrow mb-3">

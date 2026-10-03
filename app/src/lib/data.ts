@@ -68,3 +68,11 @@ export async function getSessions(limit = 50): Promise<SessionRow[]> {
   if (error) throw new Error(`getSessions: ${error.message}`);
   return (data ?? []) as SessionRow[];
 }
+
+/** True until the first chess.com sync has recorded any archive. */
+export async function needsBackfill(): Promise<boolean> {
+  const db = await getDb();
+  const { count, error } = await db.from(T.chesscom_archives).select("url", { count: "exact", head: true });
+  if (error) throw new Error(`needsBackfill: ${error.message}`);
+  return (count ?? 0) === 0;
+}
