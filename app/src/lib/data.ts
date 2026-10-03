@@ -1,5 +1,6 @@
 import "server-only";
 import { db as getDb } from "@/lib/supabase/admin";
+import { RPC, T } from "@/lib/supabase/tables";
 
 export type GameRow = {
   id: string;
@@ -24,7 +25,7 @@ const GAME_COLUMNS =
 export async function getRecentGames(limit = 10, timeClasses: string[] = ["rapid", "blitz"]): Promise<GameRow[]> {
   const db = await getDb();
   const { data, error } = await db
-    .from("games")
+    .from(T.games)
     .select(GAME_COLUMNS)
     .eq("source", "chesscom")
     .in("time_class", timeClasses)
@@ -38,14 +39,14 @@ export type PatternStat = { motif: string; games: number; occurrences: number };
 
 export async function getPatternStats(windowGames = 30): Promise<PatternStat[]> {
   const db = await getDb();
-  const { data, error } = await db.rpc("pattern_stats", { window_games: windowGames });
+  const { data, error } = await db.rpc(RPC.pattern_stats, { window_games: windowGames });
   if (error) throw new Error(`getPatternStats: ${error.message}`);
   return (data ?? []) as PatternStat[];
 }
 
 export async function getSettings() {
   const db = await getDb();
-  const { data, error } = await db.from("settings").select("*").single();
+  const { data, error } = await db.from(T.settings).select("*").single();
   if (error) throw new Error(`getSettings: ${error.message}`);
   return data;
 }
@@ -60,7 +61,7 @@ export type SessionRow = {
 export async function getSessions(limit = 50): Promise<SessionRow[]> {
   const db = await getDb();
   const { data, error } = await db
-    .from("sessions")
+    .from(T.sessions)
     .select("id, started_at, ended_at, summary")
     .order("started_at", { ascending: false })
     .limit(limit);

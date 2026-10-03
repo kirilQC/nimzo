@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameReview, type ReviewData } from "@/components/review/GameReview";
 import { db as getDb } from "@/lib/supabase/admin";
+import { T } from "@/lib/supabase/tables";
 import { pgnToPositions } from "@/lib/chess/pgn";
 import { SAMPLE_PGN } from "@/lib/chess/sample";
 import { formatDate } from "@/lib/format";
@@ -56,7 +57,7 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
     const db = await getDb();
     const { data: game } = await db
-      .from("games")
+      .from(T.games)
       .select("id, pgn, my_color, opponent, result, time_class, time_control, end_time, eco, opening_name, accuracy_ours")
       .eq("id", id)
       .maybeSingle();

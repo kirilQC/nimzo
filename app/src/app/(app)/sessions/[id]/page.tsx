@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { flagsSummary } from "@/components/ui";
 import { ClockBuckets } from "@/components/sessions/ClockBuckets";
 import { db as getDb } from "@/lib/supabase/admin";
+import { T } from "@/lib/supabase/tables";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Session summary" };
@@ -55,13 +56,13 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
   if (id !== "sample") {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
     const db = await getDb();
-    const { data } = await db.from("sessions").select("started_at, ended_at, summary").eq("id", id).maybeSingle();
+    const { data } = await db.from(T.sessions).select("started_at, ended_at, summary").eq("id", id).maybeSingle();
     if (!data) notFound();
     summary = (data.summary ?? {}) as Summary;
     const mins = minutesBetween(data.started_at, data.ended_at);
     eyebrow = ["Session summary", formatDate(data.started_at, { month: "short", day: "numeric", year: "numeric" }), mins !== null ? `${mins} min` : "In progress"].join(" · ");
     const { data: g } = await db
-      .from("games")
+      .from(T.games)
       .select("id, opponent, result, opening_name, blunders, mistakes, inaccuracies")
       .eq("session_id", id)
       .order("end_time", { ascending: true });
