@@ -17,7 +17,7 @@ A personal chess coach. Nimzo pulls finished games from chess.com, analyzes ever
 
 - [x] **Phase 1: Foundation.** Schema and migrations, no sign-in (server-only database access), design tokens, layout, nav and logo, the four screens (matched to the mockups) with empty states
 - [x] **Phase 2: chess.com sync and Session mode.** Serial chess.com client (User-Agent, ETag/Last-Modified, month rollover), 3-month backfill, Recent games, Session mode with 60s polling, auto-off and resume-on-refresh
-- [ ] Phase 3: Stockfish WASM analysis, review board, eval graph
+- [x] **Phase 3: Engine analysis.** Stockfish 19 lite (WASM, single-threaded, Web Worker) in the browser; Lichess win%, thresholds and accuracy; resumable per-game status; review board, eval graph, move list; auto-analysis of recent games and an "Analyze backlog" queue
 - [ ] Phase 4: Facts, Jev, Maia, recurring patterns
 - [ ] Phase 5: Claude coaching
 - [ ] Phase 6: Knowledge bank, puzzles, openings, coach chat
@@ -76,6 +76,15 @@ npm run dev
 - **Analyze my last game** syncs, then opens your most recent game.
 - Ratings from `/stats` are refreshed at most hourly into `nimzo_settings.ratings`.
 
+## How analysis works (Phase 3)
+
+- Stockfish 19 **lite single-threaded** WASM runs in a Web Worker in your browser (`app/public/engine/`, GPLv3, unmodified from the `stockfish` npm package v19.0.0). Single-threaded means no cross-origin isolation headers are needed.
+- While any Nimzo tab is open, a queue analyzes one game at a time: new Session games first, then the game you're viewing, then the 20 most recent unanalyzed games (`auto_analyze_recent`). **Analyze backlog** queues the rest. The nav shows progress.
+- Each position is searched at depth 16 (`thresholds.engine_depth`) with MultiPV 1; the position before each of your flagged moves is re-searched with MultiPV 3. Lines are kept to 8 plies.
+- The browser posts raw engine output to `POST /api/games/[id]/engine`. The server recomputes everything deterministically (`lib/analysis/math.ts`): Lichess win% (cp clamped to ±1000, mate = ±1000), drops on the winning-chances scale (blunder ≥ 0.3, mistake ≥ 0.2, inaccuracy ≥ 0.1, all in `nimzo_settings.thresholds`), missed mates as blunders, and Lichess per-move accuracy averaged over your moves. PVs are converted to SAN with chess.js and cut at the first illegal move.
+- Status per game: `imported → engine_done` (later phases add `facts_done → tagged → reviewed`), or `failed` with the error, shown with a **Retry analysis** button. Errors go to `nimzo_error_log`.
+- `RUN_ENGINE=1 npx vitest run src/lib/analysis/engine.integration.test.ts` runs the same engine under Node against the fixtures.
+
 ## Tests
 
 ```bash
@@ -92,6 +101,8 @@ npm run lint
 **Render:** covered in Phase 4.
 
 ## Credits
+
+- Stockfish (GPLv3) via stockfish.js by Nathan Rugg / Chess.com: https://github.com/nmrugg/stockfish.js
 
 - The knight in the Nimzo logo is based on the "Cburnett" chess pieces by Colin M.L. Burnett (CC BY-SA 3.0, via Wikimedia Commons).
 - The arched logo text uses Fraunces (SIL Open Font License).
