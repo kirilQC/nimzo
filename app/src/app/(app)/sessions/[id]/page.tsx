@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { flagsSummary } from "@/components/ui";
 import { ClockBuckets } from "@/components/sessions/ClockBuckets";
 import { SummaryWriter } from "@/components/sessions/SummaryWriter";
-import { CoachAvatar } from "@/components/coach/CoachAvatar";
-import { SpeakButton } from "@/components/coach/SpeakButton";
+import { ArthurSays } from "@/components/coach/SpokenText";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { formatDate } from "@/lib/format";
@@ -101,12 +100,11 @@ export default async function SessionPage({ params }: PageProps<"/sessions/[id]"
         <section className="card-dark flex flex-col p-6" aria-labelledby="takeaway-h">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <CoachAvatar size={44} />
+              <ArthurSays size={56} text={summary.takeaway ?? null} onceKey={summary.takeaway && id !== "sample" ? `session-${id}` : null} />
               <h2 id="takeaway-h" className="eyebrow">
                 Coach&apos;s takeaway
               </h2>
             </div>
-            {summary.takeaway && <SpeakButton text={summary.takeaway} />}
           </div>
           <p className="serif text-[1.1875rem] leading-relaxed text-panel-text">
             {summary.takeaway ?? "After the session ends, the coach writes a short paragraph here about what decided your games."}

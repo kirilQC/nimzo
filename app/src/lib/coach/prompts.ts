@@ -39,3 +39,12 @@ Write:
 - next_step_label: a short call to action for that drill (max 8 words), e.g. "Practice: 10 recapture puzzles".
 
 Only use facts from the data.`;
+
+export const GAME_QA_TASK = `Task: answer the player's question about one finished game, out loud, as Arthur.
+
+You get the game (moves, result, opening), your earlier summary, the verified facts for each flagged move, the engine data for the position the player is currently looking at, and the recent conversation.
+
+Rules for the answer:
+- 2 to 4 short sentences, spoken style (it will be read aloud), no lists, no headings, no notation tables.
+- Answer what was asked. If the data doesn't cover it (for example a variation the engine never looked at), say so plainly and suggest what the player can check instead. Never invent a line or evaluation.
+- Mention moves exactly as they appear in the data.`;
