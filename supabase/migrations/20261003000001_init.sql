@@ -222,13 +222,13 @@ create table public.lesson_chunks (
   page_start int,
   page_end int,
   token_count int,
-  embedding extensions.vector(1024),   -- Voyage voyage-4 family, 1024 dims
+  embedding vector(1024),   -- Voyage voyage-4 family, 1024 dims (unqualified: works whichever schema holds pgvector)
   unique (lesson_id, chunk_index)
 );
 create index lesson_chunks_motifs_gin on public.lesson_chunks using gin (motifs);
 create index lesson_chunks_hash_idx on public.lesson_chunks (content_hash);
 create index lesson_chunks_embedding_idx on public.lesson_chunks
-  using hnsw (embedding extensions.vector_cosine_ops);
+  using hnsw (embedding vector_cosine_ops);
 
 -- ---------------------------------------------------------------------------
 -- Puzzles
