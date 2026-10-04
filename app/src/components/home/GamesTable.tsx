@@ -2,10 +2,11 @@ import Link from "next/link";
 import { flagsSummary } from "@/components/ui";
 import type { GameRow } from "@/lib/data";
 import { RESULT_LABEL } from "@/lib/format";
+import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
 
 const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
 
-export function GamesTable({ games, caption }: { games: GameRow[]; caption: string }) {
+export function GamesTable({ games, caption, players }: { games: GameRow[]; caption: string; players?: Map<string, PlayerLook> }) {
   return (
     <div className="card table-scroll p-0">
       <table className="table">
@@ -25,8 +26,8 @@ export function GamesTable({ games, caption }: { games: GameRow[]; caption: stri
         <tbody>
           {games.map((g) => (
             <tr key={g.id}>
-              <td className="font-semibold text-ink" title={`${g.time_class ?? ""} · ${g.my_color}`}>
-                {g.opponent}
+              <td title={`${g.time_class ?? ""} · ${g.my_color}`}>
+                <PlayerBadge name={g.opponent} rating={g.opponent_rating} look={players?.get(g.opponent.toLowerCase())} size={24} />
               </td>
               <td className="text-body2" aria-label={RESULT_LABEL[g.result]}>
                 {RESULT_TEXT[g.result]}

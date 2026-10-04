@@ -10,6 +10,8 @@ import { formatDate } from "@/lib/format";
 import { describeEnding } from "@/lib/chess/ending";
 import { ReanalyzeButton } from "@/components/review/ReanalyzeButton";
 import { env } from "@/lib/env";
+import { getPlayers } from "@/lib/chesscom/players";
+import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
 
 const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
 
@@ -22,7 +24,13 @@ function timeLabel(tc: string | null, timeClass: string | null): string | null {
 
 export const metadata: Metadata = { title: "Game review" };
 
-type Header = { title: string; meta: string[]; ending: string | null; gameId: string | null };
+type Header = {
+  title: string;
+  meta: string[];
+  ending: string | null;
+  gameId: string | null;
+  players?: { me: { name: string; rating: number | null; color: string; look?: PlayerLook }; opp: { name: string; rating: number | null; look?: PlayerLook } };
+};
 
 export default async function GamePage({ params, searchParams }: PageProps<"/games/[id]">) {
   const { id } = await params;
@@ -68,6 +76,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
       positions: (positions ?? []) as PositionRecord[],
     });
     const me = env().CHESSCOM_USERNAME;
+    const looks = await getPlayers([me, game.opponent]);
     data.players = {
       me: game.my_rating ? `${me} (${game.my_rating})` : me,
       opponent: game.opponent_rating ? `${game.opponent} (${game.opponent_rating})` : game.opponent,
@@ -88,6 +97,10 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
       ].filter((x): x is string => !!x),
       ending: ending.long,
       gameId: game.id,
+      players: {
+        me: { name: me, rating: game.my_rating, color, look: looks.get(me.toLowerCase()) },
+        opp: { name: game.opponent, rating: game.opponent_rating, look: looks.get(game.opponent.toLowerCase()) },
+      },
     };
   }
 
@@ -97,7 +110,15 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
         <Link href="/games" className="arrow-link font-normal">
           ← All games
         </Link>
-        <h1 className="text-[1.75rem]">{header.title}</h1>
+        {header.players ? (
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[1.375rem]">
+            <PlayerBadge name={header.players.me.name} rating={header.players.me.rating} look={header.players.me.look} size={34} />
+            <span className="text-base font-normal text-muted">({header.players.me.color}) vs</span>
+            <PlayerBadge name={header.players.opp.name} rating={header.players.opp.rating} look={header.players.opp.look} size={34} />
+          </h1>
+        ) : (
+          <h1 className="text-[1.75rem]">{header.title}</h1>
+        )}
         <p className="text-sm text-muted">
           {header.ending && <span className="font-semibold text-ink">{header.ending} · </span>}
           {header.meta.join(" · ")}

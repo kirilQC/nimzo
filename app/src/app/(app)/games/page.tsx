@@ -3,11 +3,13 @@ import { PageHeader } from "@/components/ui";
 import { GamesExplorer, type ExplorerGame } from "@/components/games/GamesExplorer";
 import { getAllGames } from "@/lib/data";
 import { describeEnding } from "@/lib/chess/ending";
+import { getPlayers } from "@/lib/chesscom/players";
 
 export const metadata: Metadata = { title: "My games" };
 
 export default async function GamesPage() {
   const games = await getAllGames();
+  const players = await getPlayers(games.map((g) => g.opponent));
   const rows: ExplorerGame[] = games.map((g) => {
     const ending = describeEnding(g.result, g.result_detail);
     return {
@@ -15,6 +17,7 @@ export default async function GamesPage() {
       end: g.end_time,
       color: g.my_color,
       opponent: g.opponent,
+      oppLook: players.get(g.opponent.toLowerCase()) ?? null,
       oppRating: g.opponent_rating,
       myRating: g.my_rating,
       result: g.result,

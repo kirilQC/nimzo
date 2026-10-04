@@ -39,3 +39,14 @@ export const statsSchema = z
   })
   .passthrough();
 export type ChesscomStats = z.infer<typeof statsSchema>;
+
+/** /pub/player/{username}: a public profile. */
+export const playerProfileSchema = z.object({
+  username: z.string(),
+  avatar: z.string().url().optional(),
+  country: z.string().url().optional(),
+  title: z.string().optional(),
+  league: z.string().optional(),
+  url: z.string().url().optional(),
+});
+export type PlayerProfile = z.infer<typeof playerProfileSchema>;

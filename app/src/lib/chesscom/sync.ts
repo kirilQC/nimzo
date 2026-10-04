@@ -4,6 +4,7 @@ import { T } from "@/lib/supabase/tables";
 import { env } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { chesscom, monthArchiveUrl } from "./client";
+import { refreshPlayers } from "./players";
 import {
   addMonths,
   archiveComplete,
@@ -84,6 +85,7 @@ export async function syncChesscom(
   }
 
   const result: SyncResult = { mode, remaining, checked: [], notModified: [], imported: 0, skipped: 0, newGameIds: [], latestGameId: null };
+  const newOpponents = new Set<string>();
 
   for (const url of targets) {
     const prev = known.get(url);
@@ -108,6 +110,7 @@ export async function syncChesscom(
     }
 
     const fresh = await filterExisting(rows);
+    for (const r of fresh) newOpponents.add(r.opponent);
     if (fresh.length) {
       const { data: inserted, error } = await db
         .from(T.games)
@@ -131,6 +134,9 @@ export async function syncChesscom(
       { onConflict: "url" },
     );
   }
+
+  // Avatars and countries for new opponents (and the player), shown in game lists. Best effort, capped per sync.
+  if (newOpponents.size) await refreshPlayers([username, ...newOpponents], { limit: 25 }).catch(() => undefined);
 
   // Mark the current month as checked even if it had no archive yet, so the
   // backfill runs once rather than on every sync.

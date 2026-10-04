@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { env } from "@/lib/env";
-import { archivesSchema, monthArchiveSchema, statsSchema } from "./schema";
+import { archivesSchema, monthArchiveSchema, playerProfileSchema, statsSchema } from "./schema";
 
 /*
  * chess.com Published-Data API client.
@@ -82,4 +82,6 @@ export const chesscom = {
   archives: () => getJson(`${player()}/games/archives`, archivesSchema),
   month: (url: string, cond?: Conditional) => getJson(url, monthArchiveSchema, cond),
   stats: () => getJson(`${player()}/stats`, statsSchema),
+  /** Any player's public profile (avatar, country, title): finished-game data only, nothing live. */
+  profile: (username: string) => getJson(`${BASE}/player/${encodeURIComponent(username.toLowerCase())}`, playerProfileSchema),
 };

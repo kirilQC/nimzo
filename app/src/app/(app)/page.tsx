@@ -3,10 +3,10 @@ import { EmptyState } from "@/components/ui";
 import { SessionCard } from "@/components/home/SessionCard";
 import { GamesTable } from "@/components/home/GamesTable";
 import { PatternBars } from "@/components/home/PatternBars";
-import { BacklogButton } from "@/components/home/BacklogButton";
 import { CoachAvatar } from "@/components/coach/CoachAvatar";
 import { getPatternStats, getRecentGames, getSettings, needsBackfill } from "@/lib/data";
 import { getOpenSession, getSessionGames } from "@/lib/sessions";
+import { getPlayers } from "@/lib/chesscom/players";
 
 const WINDOW = 30;
 
@@ -19,6 +19,7 @@ export default async function HomePage() {
     getOpenSession(),
   ]);
   const openSessionGames = openSession ? await getSessionGames(openSession.id) : [];
+  const players = await getPlayers(games.map((g) => g.opponent));
   const topStats = stats.slice(0, 5);
 
   return (
@@ -57,10 +58,9 @@ export default async function HomePage() {
           <h2 id="recent-h" className="section-title">
             Recent games
           </h2>
-          <BacklogButton />
         </div>
         {games.length ? (
-          <GamesTable games={games} caption="Recent rapid and blitz games" />
+          <GamesTable games={games} caption="Recent rapid and blitz games" players={players} />
         ) : (
           <div className="card">
             <EmptyState title="No games yet">

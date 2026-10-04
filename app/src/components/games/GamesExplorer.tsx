@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RatingChart, type RatingSeries } from "./RatingChart";
+import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
 
 export type ExplorerGame = {
   id: string;
   end: string; // ISO
   color: "white" | "black";
   opponent: string;
+  oppLook: PlayerLook | null;
   oppRating: number | null;
   myRating: number | null;
   result: "win" | "loss" | "draw";
@@ -256,8 +258,8 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
                 </td>
                 <td className="whitespace-nowrap font-semibold text-ink">
                   <span className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full border border-line align-middle ${g.color === "white" ? "bg-white" : "bg-[#2b2724]"}`} title={`You played ${g.color}`} aria-label={`You played ${g.color}`} />
-                  <Link href={`/games/${g.id}`} className="text-ink hover:underline" title={g.status === "imported" ? "Open and analyze this game" : "Review this game"}>
-                    {g.opponent}
+                  <Link href={`/games/${g.id}`} className="text-ink no-underline hover:underline" title={g.status === "imported" ? "Open and analyze this game" : "Review this game"}>
+                    <PlayerBadge name={g.opponent} look={g.oppLook ?? undefined} size={24} />
                   </Link>
                 </td>
                 <td className="mono text-right text-body2">{g.oppRating ?? "–"}</td>

@@ -24,7 +24,6 @@ type Ctx = {
   queueLength: number;
   backlog: number;
   enqueue: (ids: string[], opts?: { front?: boolean; force?: boolean }) => void;
-  analyzeBacklog: () => Promise<void>;
   retry: (id: string) => Promise<void>;
 };
 
@@ -208,12 +207,6 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
     };
   }, [autoRecent, enqueue]);
 
-  const analyzeBacklog = useCallback(async () => {
-    const d = (await fetch("/api/analysis/pending", { cache: "no-store" }).then((r) => r.json())) as { ids: string[]; backlog: number };
-    setBacklog(d.backlog);
-    enqueue(d.ids);
-  }, [enqueue]);
-
   const retry = useCallback(
     async (id: string) => {
       await fetch(`/api/games/${id}/status`, {
@@ -227,8 +220,8 @@ export function AnalysisProvider({ children, depth, autoRecent }: { children: Re
   );
 
   const value = useMemo<Ctx>(
-    () => ({ jobs, current, queueLength, backlog, enqueue, analyzeBacklog, retry }),
-    [jobs, current, queueLength, backlog, enqueue, analyzeBacklog, retry],
+    () => ({ jobs, current, queueLength, backlog, enqueue, retry }),
+    [jobs, current, queueLength, backlog, enqueue, retry],
   );
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
