@@ -87,6 +87,13 @@ export async function runReviewStep(gameId: string): Promise<{ notes: number; mo
   if (!game) throw new Error("game not found");
   if (error) throw new Error(`load move features: ${error.message}`);
   const feats = (rows ?? []) as FeatureRow[];
+  if (!feats.length && game.move_count === 0) {
+    // The game ended before a move was played (an instant resignation or abandonment): nothing to review.
+    const summary = { version: 3, headline: "No moves were played", verdict: "mixed", story: ["This game ended before a single move was played.", "There is nothing to learn from it on the board."], momentum: "The game never started.", fell_short: [], went_well: [], conclusion: "", knowledge_used: [] };
+    await db.from(T.game_reviews).upsert({ game_id: gameId, summary, model: "none" }, { onConflict: "game_id" });
+    await db.from(T.games).update({ analysis_status: "reviewed", analysis_updated_at: new Date().toISOString() }).eq("id", gameId);
+    return { notes: 0, model: "none" };
+  }
   if (!feats.length) throw new Error("no move features; run the facts step first");
   const maia = new Map((mistakes ?? []).map((m) => [m.ply as number, m.maia as { p_played: number; p_best: number | null } | null]));
 

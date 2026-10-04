@@ -32,7 +32,8 @@ You get: totals, accuracy, errors per game, his problem tags ranked by what they
 Rules:
 - Every claim must come from the numbers. Put the number in the evidence field ("in 41% of games", "2.3 times more often when winning").
 - Only treat a condition as a pattern if it is marked significant.
-- Rank weaknesses by how many points they cost him, not by how dramatic they sound. Group related tags into one weakness (for example hanging pieces after captures, losing captures and miscounted exchanges are one habit).
+- Rank weaknesses by cost_score_for_ranking_only (already the order given), not by how dramatic they sound. Never quote that score: it is not a unit he would understand. Quote game percentages and rates per game instead.
+- For Maia, quote the share of mistakes that are blind spots; the tag counts there are tag appearances, not numbers of mistakes. Group related tags into one weakness (for example hanging pieces after captures, losing captures and miscounted exchanges are one habit).
 - Be kind and direct. He wants to improve; name the habits plainly.
 
 Write:
@@ -51,13 +52,21 @@ House style: no notation, no square names, no dashes, short sentences.`;
 
 /** Smaller copy of the stats for the prompt (examples and long tails trimmed). */
 function compact(s: ProfileStats) {
-  const tag = (t: ProfileStats["weaknesses"][number]) => ({ id: t.id, label: t.label, meaning: t.plain, games_pct: t.games_pct, per_game: t.per_game, winning_chances_lost_per_game: t.lost_per_game, avg_lost_when_it_happens: t.avg_lost, recent_per_game: t.recent_per_game, earlier_per_game: t.earlier_per_game, trend: t.trend, source: t.source });
+  const tag = (t: ProfileStats["weaknesses"][number]) => ({ id: t.id, label: t.label, meaning: t.plain, games_pct: t.games_pct, per_game: t.per_game, cost_score_for_ranking_only: t.lost_per_game, recent_per_game: t.recent_per_game, earlier_per_game: t.earlier_per_game, trend: t.trend, source: t.source });
   return {
     ...s,
     weaknesses: s.weaknesses.slice(0, 25).map(tag),
     strengths: s.strengths.slice(0, 10).map(tag),
     conditions: s.conditions.map(({ dimension, bucket, moves, big_error_rate, lift, significant }) => ({ dimension, bucket, moves, big_error_rate, lift, significant })),
     openings: s.openings.slice(0, 12),
+    maia: {
+      mistakes_checked: s.maia.mistakes_checked,
+      blind_spot_share_of_mistakes_pct: s.maia.blind_spot_share,
+      normal_for_level_share_of_mistakes_pct: s.maia.normal_for_level_share,
+      // Counts here are how often each tag appeared on those mistakes (one mistake can carry several tags).
+      tags_seen_on_blind_spot_mistakes: s.maia.blind_spot_tags.map((t) => ({ label: t.label, tag_appearances: t.count })),
+      tags_seen_on_normal_mistakes: s.maia.normal_for_level_tags.map((t) => ({ label: t.label, tag_appearances: t.count })),
+    },
   };
 }
 
