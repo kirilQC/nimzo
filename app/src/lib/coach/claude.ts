@@ -5,6 +5,9 @@ import type { z } from "zod";
 import { env } from "@/lib/env";
 
 let client: Anthropic | undefined;
+
+/** Running token totals for this process (the batch runner reports cost from these). */
+export const claudeUsage = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 export function anthropic(): Anthropic {
   client ??= new Anthropic({ apiKey: env().ANTHROPIC_API_KEY });
   return client;
@@ -32,6 +35,11 @@ export async function structuredCall<S extends z.ZodType>(args: {
     system: [{ type: "text", text: args.system, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: args.user }],
   });
+  claudeUsage.calls++;
+  claudeUsage.input += response.usage.input_tokens;
+  claudeUsage.output += response.usage.output_tokens;
+  claudeUsage.cacheRead += response.usage.cache_read_input_tokens ?? 0;
+  claudeUsage.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
   if (response.stop_reason === "refusal") throw new Error("Claude declined the request");
   if (response.stop_reason === "max_tokens") throw new Error("Claude ran out of output tokens");
   if (!response.parsed_output) throw new Error("Claude returned no parseable output");

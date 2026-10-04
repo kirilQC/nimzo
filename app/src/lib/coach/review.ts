@@ -58,8 +58,8 @@ function problemsIn(out: GameReviewOutput, plies: Set<number>): string[] {
     const n = notationIn(t);
     if (n.length) problems.push(`summary uses notation (${n.join(", ")})`);
     for (const b of bannedIn(t)) problems.push(`summary ${b}: "${t.slice(0, 60)}"`);
-    // The conclusion's fixed "Your biggest mistake was ..., so work on ..." shape needs a little more room.
-    for (const s of longSentences(t, t === out.conclusion ? 30 : 24)) problems.push(`summary sentence too long: "${s.slice(0, 60)}..."`);
+    // The conclusion's fixed shape and the momentum arc (start, middle, end) need a little more room.
+    for (const s of longSentences(t, t === out.conclusion || t === out.momentum ? 30 : 24)) problems.push(`summary sentence too long: "${s.slice(0, 60)}..."`);
   }
   for (const m of out.moves) {
     const n = notationIn(m.note);

@@ -32,7 +32,7 @@ Write:
 1. headline: max 10 words, sums up the game, like "A sharp attack, then three missed chances" or "Clean opening, steady win".
 2. verdict: one of excellent, good, mixed, rough, judged against his own other games.
 3. story: exactly 2 short paragraphs, each 2 or 3 short sentences. Paragraph 1: how the opening and early game went. Paragraph 2: the turning point and how it ended.
-4. momentum: ONE sentence about who had the advantage when, from the momentum data. For example "You had the edge for the first half, fell behind after move 20, then fought back." Don't quote percentages.
+4. momentum: ONE sentence (at most 20 words) about who had the advantage when, from the momentum data. For example "You had the edge for the first half, fell behind after move 20, then fought back." Don't quote percentages.
 5. fell_short: 2 or 3 bullet points. Each is one short sentence naming a pattern he fell for and when, like "Move 5: you grabbed a pawn and left your knight hanging." Use the tags and the knowledge sections to name the pattern (fork, pin, loose piece, missed check).
 6. went_well: 1 or 2 bullet points, one short sentence each, concrete and from the facts.
 7. conclusion: ONE sentence in exactly this shape: "Your biggest mistake was ..., so work on ...". Make the mistake a pattern, not a move, and the fix a habit from the knowledge base.

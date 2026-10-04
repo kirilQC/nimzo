@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db as getDb } from "@/lib/supabase/admin";
 import { T } from "@/lib/supabase/tables";
 import { buildFacts, type MoveFacts, type PositionInput } from "@/lib/analysis/facts";
+import { buildAnalysis, type EnginePayloadInput } from "@/lib/analysis/persist";
 import { buildFeatures, type EnginePosition, type MoveFeatures } from "@/lib/analysis/features";
 import { isSeverity } from "@/lib/analysis/math";
 import { jevClassify, JEV_MIN_PROBABILITY, type JevResult } from "@/lib/tags/jev";
@@ -18,6 +19,30 @@ import { saveGameAnalysis } from "@/lib/analysis/gameRow";
  */
 
 const POSITION_COLS = "ply, eval_cp, eval_mate, classification, best_move_san, best_move_uci, pv_san, multipv";
+
+/**
+ * Step 1: store a game's Stockfish results (from the browser or the PC batch
+ * runner), with classifications and accuracy recomputed here, then run step 2.
+ */
+export async function saveEngineResults(gameId: string, payload: EnginePayloadInput): Promise<{ mistakes: number }> {
+  const db = await getDb();
+  const { data: game } = await db.from(T.games).select("id, pgn, my_color").eq("id", gameId).maybeSingle();
+  if (!game) throw new Error("game not found");
+  const { data: settings } = await db.from(T.settings).select("thresholds").single();
+  const t = (settings?.thresholds ?? {}) as { inaccuracy?: number; mistake?: number; blunder?: number };
+  const thresholds = t.inaccuracy && t.mistake && t.blunder ? { inaccuracy: t.inaccuracy, mistake: t.mistake, blunder: t.blunder } : undefined;
+  const { rows, totals } = buildAnalysis({ gameId, pgn: game.pgn, myColor: game.my_color, payload, thresholds });
+  const { error: delErr } = await db.from(T.positions).delete().eq("game_id", gameId);
+  if (delErr) throw new Error(`clear positions: ${delErr.message}`);
+  const { error: insErr } = await db.from(T.positions).insert(rows);
+  if (insErr) throw new Error(`insert positions: ${insErr.message}`);
+  const { error: upErr } = await db
+    .from(T.games)
+    .update({ ...totals, analysis_status: "engine_done", analysis_error: null, analysis_updated_at: new Date().toISOString() })
+    .eq("id", gameId);
+  if (upErr) throw new Error(`update game: ${upErr.message}`);
+  return runFactsStep(gameId); // deterministic and fast, so it runs right away
+}
 
 /**
  * Step 2: deterministic facts. Features and rule tags for every move (both
@@ -194,7 +219,7 @@ export async function runTagStep(gameId: string): Promise<{ tagged: number; fail
       }
     }
   };
-  await Promise.all(Array.from({ length: 8 }, worker));
+  await Promise.all(Array.from({ length: Number(process.env.JEV_CONCURRENCY) || 8 }, worker));
   await db.from(T.games).update({ analysis_status: "tagged", analysis_updated_at: new Date().toISOString() }).eq("id", gameId);
   await saveGameAnalysis(gameId).catch((e) => logError("analysis.row", e, {}, gameId));
   return { tagged: (rows ?? []).length, failed, cost };

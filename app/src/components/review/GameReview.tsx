@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAnalysis } from "@/components/analysis/AnalysisProvider";
 import { Board } from "@/components/board/Board";
 import { EvalBar } from "@/components/board/EvalBar";
 import { EvalGraph } from "@/components/board/EvalGraph";
@@ -96,6 +97,15 @@ export function GameReview({ data }: { data: ReviewData }) {
   const [current, setCurrent] = useState<number>(data.summary ? 0 : (firstFlag ?? 0));
   const listRef = useRef<HTMLOListElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const { enqueue } = useAnalysis();
+  const reviewRequested = useRef(false);
+
+  // Analyzed in bulk but not reviewed yet: Arthur writes this game's review now that it's open.
+  useEffect(() => {
+    if (reviewRequested.current || !data.gameId || data.status !== "tagged") return;
+    reviewRequested.current = true;
+    enqueue([data.gameId], { front: true });
+  }, [data.gameId, data.status, enqueue]);
 
   const go = useCallback(
     (ply: number) => {
