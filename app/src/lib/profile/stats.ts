@@ -127,8 +127,11 @@ export async function computeProfileStats(timeClass = "rapid") {
     const recentRate = recentN ? recent / recentN : 0;
     const earlierRate = earlierN ? earlier / earlierN : null;
     const trend = earlierRate === null || earlierN < 50 ? "new" : recentRate < earlierRate * 0.8 ? "improving" : recentRate > earlierRate * 1.2 ? "worse" : "steady";
+    // The most recent example from each of four different games, so the pattern shows up across games.
+    const seenGames = new Set<string>();
     const examples = [...ms]
       .sort((a, b) => (gameById.get(b.game_id)!.end_time > gameById.get(a.game_id)!.end_time ? 1 : -1))
+      .filter((m) => (seenGames.has(m.game_id) ? false : (seenGames.add(m.game_id), true)))
       .slice(0, 4)
       .map((m) => ({ game_id: m.game_id, ply: m.ply, move_number: m.move_number, date: gameById.get(m.game_id)!.end_time.slice(0, 10) }));
     // What the pattern costs: winning chances lost on the moves where it appears, per game.
