@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <AnalysisProvider depth={depth} autoRecent={settings.auto_analyze_recent ?? 20}>
       <Nav username={env().CHESSCOM_USERNAME} />
-      <main className="mx-auto max-w-[1080px] px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-[1600px] px-6 py-8 lg:px-10">{children}</main>
     </AnalysisProvider>
   );
 }

@@ -177,7 +177,7 @@ export function GameReview({ data }: { data: ReviewData }) {
   const selectedCoach = pos && pos.isMine && pos.severity ? coach[pos.ply] : undefined;
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[480px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[480px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)] 2xl:grid-cols-[680px_minmax(0,1fr)]">
       {/* Board column */}
       <div className="min-w-0 space-y-4">
         <div

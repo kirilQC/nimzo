@@ -16,7 +16,7 @@ export function Nav({ username }: { username: string }) {
   const pathname = usePathname();
   return (
     <header className="border-b border-line bg-card">
-      <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-x-8 gap-y-1 px-6 py-3">
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-8 gap-y-1 px-6 py-3 lg:px-10">
         <Link href="/" className="flex items-center gap-2.5 no-underline" aria-label="Nimzo home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/badge.svg" width={40} height={40} alt="" />
