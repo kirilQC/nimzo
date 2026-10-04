@@ -24,8 +24,9 @@ export const metadata: Metadata = { title: "Game review" };
 
 type Header = { title: string; meta: string[]; ending: string | null; gameId: string | null };
 
-export default async function GamePage({ params }: PageProps<"/games/[id]">) {
+export default async function GamePage({ params, searchParams }: PageProps<"/games/[id]">) {
   const { id } = await params;
+  const plyParam = Number((await searchParams).ply); // ?ply=N opens the game at that move (links from the Profile tab)
 
   let header: Header;
   let data: ReviewData;
@@ -107,7 +108,7 @@ export default async function GamePage({ params }: PageProps<"/games/[id]">) {
           </span>
         )}
       </div>
-      <GameReview data={data} />
+      <GameReview data={Number.isInteger(plyParam) && plyParam > 0 ? { ...data, initialPly: plyParam } : data} />
     </div>
   );
 }

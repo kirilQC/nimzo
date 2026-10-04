@@ -77,11 +77,12 @@ const maiaPredict = (fen: string, elo: number) => {
   return p;
 };
 
-// ---- Simple semaphore for Arthur's reviews ----
-let reviewSlots = REVIEW_CONCURRENCY;
-const waiting: (() => void)[] = [];
-const acquire = () => (reviewSlots > 0 ? (reviewSlots--, Promise.resolve()) : new Promise<void>((r) => waiting.push(r)));
-const release = () => (waiting.length ? waiting.shift()!() : reviewSlots++);
+// ---- Engines: cleaned up however the run ends ----
+const engines: NodeEngine[] = [];
+const stopAll = () => engines.forEach((e) => { try { e.quit(); } catch { /* already gone */ } });
+process.on("exit", stopAll);
+process.on("SIGINT", () => { stopAll(); process.exit(130); });
+process.on("SIGTERM", () => { stopAll(); process.exit(143); });
 
 // ---- One game ----
 async function positionsComplete(g: Game): Promise<boolean> {
@@ -113,15 +114,6 @@ async function analyze(g: Game, engine: NodeEngine) {
   }
   const tag = await runTagStep(g.id);
   steps.push("jev");
-  if (reviewIds.has(g.id)) {
-    await acquire();
-    try {
-      await runReviewStep(g.id);
-      steps.push("review");
-    } finally {
-      release();
-    }
-  }
   return { secs: Math.round((Date.now() - t0) / 1000), steps, jev: tag.cost, jevFailed: tag.failed };
 }
 
@@ -129,10 +121,18 @@ async function analyze(g: Game, engine: NodeEngine) {
 const start = Date.now();
 let finished = 0, failed = 0, jevCost = 0;
 const queue = [...todo];
+// Games that still need Arthur's review: analyzed first, reviewed by a separate small pool so engines never wait.
+const reviewQueue: Game[] = todo.filter((g) => reviewIds.has(g.id) && g.analysis_status === "tagged" && rowVersion.get(g.id) === PIPELINE_VERSION);
+const toAnalyze = queue.filter((g) => !reviewQueue.includes(g));
+queue.length = 0;
+queue.push(...toAnalyze);
+let analyzing = true;
+let reviewed = 0;
 const opusCost = () => (claudeUsage.input * 4 + claudeUsage.cacheWrite * 5 + claudeUsage.cacheRead * 0.4 + claudeUsage.output * 20) / 1e6;
 
 async function worker(n: number) {
   const engine = new NodeEngine();
+  engines.push(engine);
   await engine.init();
   for (let g = queue.shift(); g; g = queue.shift()) {
     try {
@@ -140,8 +140,9 @@ async function worker(n: number) {
       finished++;
       jevCost += r.jev;
       log({ game: g.id, end: g.end_time, ok: true, ...r });
+      if (reviewIds.has(g.id)) reviewQueue.push(g);
       const elapsed = (Date.now() - start) / 1000;
-      const eta = ((elapsed / (finished + failed)) * queue.length) / 60;
+      const eta = ((elapsed / (finished + failed)) * queue.length) / 60; // engine stage; reviews trail it
       console.log(
         `[${finished + failed}/${todo.length}] w${n} ${g.end_time.slice(0, 10)} ${r.steps.join("+")} ${r.secs}s | Jev $${jevCost.toFixed(3)} Opus $${opusCost().toFixed(2)} | ~${eta.toFixed(0)} min left`,
       );
@@ -154,10 +155,35 @@ async function worker(n: number) {
   }
   engine.quit();
 }
-await Promise.all(Array.from({ length: Math.min(WORKERS, todo.length) }, (_, i) => worker(i + 1)));
+console.log(`${queue.length} games to analyze, ${reviewQueue.length} analyzed games waiting for Arthur's review.`);
+async function reviewer(n: number) {
+  for (;;) {
+    const g = reviewQueue.shift();
+    if (!g) {
+      if (!analyzing) return;
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+    try {
+      const t0 = Date.now();
+      await runReviewStep(g.id);
+      reviewed++;
+      log({ game: g.id, review: true, secs: Math.round((Date.now() - t0) / 1000) });
+      console.log(`  review ${reviewed} r${n} ${g.end_time.slice(0, 10)} ${Math.round((Date.now() - t0) / 1000)}s | Opus ${opusCost().toFixed(2)}`);
+    } catch (e) {
+      failed++;
+      log({ game: g.id, review: true, ok: false, error: (e as Error).message });
+      console.log(`  review FAILED ${g.id}: ${(e as Error).message}`);
+    }
+  }
+}
+const reviewers = Array.from({ length: REVIEW_CONCURRENCY }, (_, i) => reviewer(i + 1));
+await Promise.all(Array.from({ length: Math.min(WORKERS, queue.length) }, (_, i) => worker(i + 1)));
+analyzing = false;
+await Promise.all(reviewers);
 
 const mins = ((Date.now() - start) / 60000).toFixed(1);
-const reviews = todo.filter((g) => reviewIds.has(g.id)).length;
+const reviews = reviewed;
 const summary = {
   done: finished,
   failed,

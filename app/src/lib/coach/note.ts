@@ -7,6 +7,7 @@ import { motifLabel } from "@/lib/taxonomy";
 import { structuredCall } from "./claude";
 import { noDashes } from "./text";
 import { COACH_NOTE_TASK, COACH_VOICE } from "./prompts";
+import { playerMemory } from "@/lib/profile/memory";
 
 export const NOTE_WINDOW = 30;
 
@@ -24,7 +25,7 @@ export async function refreshCoachNote(): Promise<string | null> {
 
   const { data } = await structuredCall({
     model: env().CLAUDE_MODEL_COACH,
-    system: `${COACH_VOICE}\n\n${COACH_NOTE_TASK}`,
+    system: `${COACH_VOICE}\n\n${await playerMemory()}\n\n${COACH_NOTE_TASK}`,
     user: JSON.stringify({
       games_analyzed: Math.min(analyzed ?? 0, NOTE_WINDOW),
       patterns: top.map((s) => ({ motif: motifLabel(s.motif), motif_id: s.motif, games: s.games, times: s.occurrences })),

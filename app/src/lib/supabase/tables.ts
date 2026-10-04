@@ -3,7 +3,7 @@
 const TABLES = [
   "taxonomy_tags", "openings", "settings", "chesscom_archives", "sessions", "games", "positions",
   "mistakes", "game_reviews", "knowledge_documents", "lessons", "lesson_chunks", "puzzles",
-  "puzzle_attempts", "chat_threads", "chat_messages", "error_log", "move_features", "game_analysis",
+  "puzzle_attempts", "chat_threads", "chat_messages", "error_log", "move_features", "game_analysis", "player_profiles",
 ] as const;
 
 type Table = (typeof TABLES)[number];

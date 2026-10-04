@@ -9,6 +9,7 @@ import { MOTIFS, motifLabel } from "@/lib/taxonomy";
 import { structuredCall } from "./claude";
 import { noDashes } from "./text";
 import { COACH_VOICE, SESSION_SUMMARY_TASK } from "./prompts";
+import { playerMemory } from "@/lib/profile/memory";
 
 export const CLOCK_BUCKETS = [
   { bucket: "5 min +", min: 300_000, max: Infinity },
@@ -82,7 +83,7 @@ export async function summarizeSession(sessionId: string): Promise<SessionSummar
 
   const { data } = await structuredCall({
     model: env().CLAUDE_MODEL_COACH,
-    system: `${COACH_VOICE}\n\n${SESSION_SUMMARY_TASK}`,
+    system: `${COACH_VOICE}\n\n${await playerMemory()}\n\n${SESSION_SUMMARY_TASK}`,
     user: JSON.stringify({
       stats,
       blunders_by_time_left: buckets,

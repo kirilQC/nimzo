@@ -11,6 +11,7 @@ import type { MoveFacts } from "@/lib/analysis/facts";
 import { knowledgeFor, searchKnowledge, sectionText } from "@/lib/knowledge";
 import { structuredCall } from "./claude";
 import { COACH_VOICE, GAME_QA_TASK } from "./prompts";
+import { playerMemory } from "@/lib/profile/memory";
 import { notationIn } from "./guard";
 import { longSentences, noDashes } from "./text";
 import { EXPRESSIONS, QA_EXPRESSIONS, type Expression } from "./expressions";
@@ -92,7 +93,7 @@ export async function askAboutGame(gameId: string, question: string, ply: number
   };
 
   const faces = QA_EXPRESSIONS.map((e) => `- ${e}: ${EXPRESSIONS[e]}`).join("\n");
-  const system = `${COACH_VOICE}\n\n${GAME_QA_TASK}\n\nAlso choose the facial expression you'd naturally have while saying your answer:\n${faces}`;
+  const system = `${COACH_VOICE}\n\n${await playerMemory()}\n\n${GAME_QA_TASK}\n\nAlso choose the facial expression you'd naturally have while saying your answer:\n${faces}`;
   const schema = z.object({ answer: z.string(), expression: z.enum(QA_EXPRESSIONS as [Expression, ...Expression[]]) });
   let user = JSON.stringify(context);
   let answer = "";

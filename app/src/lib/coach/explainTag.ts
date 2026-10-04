@@ -8,6 +8,7 @@ import { JEV_CRITERIA, TAG_BY_ID } from "@/lib/tags/catalog";
 import { TAG_KNOWLEDGE, sectionText, sectionTitle } from "@/lib/knowledge";
 import { structuredCall } from "./claude";
 import { COACH_VOICE, TAG_EXPLAIN_TASK } from "./prompts";
+import { playerMemory } from "@/lib/profile/memory";
 import { notationIn } from "./guard";
 import { plainMove } from "./plain";
 import { longSentences, noDashes } from "./text";
@@ -46,8 +47,9 @@ export async function explainTag(gameId: string, ply: number, tag: string): Prom
   let user = JSON.stringify(input);
   let text = "";
   let model = env().CLAUDE_MODEL_COACH;
+  const memory = await playerMemory();
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await structuredCall({ model: env().CLAUDE_MODEL_COACH, system: `${COACH_VOICE}\n\n${TAG_EXPLAIN_TASK}`, user, schema, effort: "low", maxTokens: 1500 });
+    const res = await structuredCall({ model: env().CLAUDE_MODEL_COACH, system: `${COACH_VOICE}\n\n${memory}\n\n${TAG_EXPLAIN_TASK}`, user, schema, effort: "low", maxTokens: 1500 });
     text = noDashes(res.data.text.trim());
     model = res.model;
     const bad = [...notationIn(text).map((n) => `notation ${n}`), ...longSentences(text, 24).map(() => "a sentence is too long")];

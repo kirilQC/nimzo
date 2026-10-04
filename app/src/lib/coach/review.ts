@@ -9,6 +9,7 @@ import { describeEnding } from "@/lib/chess/ending";
 import { knowledgeFor } from "@/lib/knowledge";
 import { structuredCall } from "./claude";
 import { COACH_VOICE, GAME_REVIEW_TASK } from "./prompts";
+import { playerMemory } from "@/lib/profile/memory";
 import { notationIn } from "./guard";
 import { plainMove } from "./plain";
 import { momentum } from "./momentum";
@@ -117,7 +118,7 @@ export async function runReviewStep(gameId: string): Promise<{ notes: number; mo
     moves: feats.map((r) => plainMove(r.features, r.tags ?? [], { intent: r.intent, root_cause: r.root_cause, maia: maia.get(r.ply) ?? null })),
   };
 
-  const system = `${COACH_VOICE}\n\n${GAME_REVIEW_TASK}`;
+  const system = `${COACH_VOICE}\n\n${await playerMemory()}\n\n${GAME_REVIEW_TASK}`;
   let user = JSON.stringify(input);
   let out: GameReviewOutput | null = null;
   let model = env().CLAUDE_MODEL_REVIEW;

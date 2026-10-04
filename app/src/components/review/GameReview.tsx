@@ -84,6 +84,7 @@ export type ReviewData = {
   accuracyOpponent: number | null;
   counts: { me: Record<LabelId, number>; opponent: Record<LabelId, number> } | null;
   players?: { me: string; opponent: string };
+  initialPly?: number; // open at this move
 };
 
 function moveLabel(p: { ply: number; color: "w" | "b"; san: string }, suffix = "") {
@@ -94,7 +95,7 @@ export function GameReview({ data }: { data: ReviewData }) {
   const { plies, startFen, myColor, coach } = data;
   const firstFlag = plies.find((p) => p.isMine && p.severity)?.ply;
   // With a summary, start at the beginning so Arthur greets you first; Next mistake walks the flagged moves.
-  const [current, setCurrent] = useState<number>(data.summary ? 0 : (firstFlag ?? 0));
+  const [current, setCurrent] = useState<number>(data.initialPly ?? (data.summary ? 0 : (firstFlag ?? 0)));
   const listRef = useRef<HTMLOListElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const { enqueue } = useAnalysis();

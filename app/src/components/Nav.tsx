@@ -7,6 +7,7 @@ import { AnalysisStatus } from "@/components/analysis/AnalysisProvider";
 const LINKS = [
   { href: "/", label: "Analyze", match: (p: string) => p === "/" },
   { href: "/games", label: "My games", match: (p: string) => p.startsWith("/games") },
+  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") },
   { href: "/learn", label: "Learn", match: (p: string) => p.startsWith("/learn") },
   { href: "/sessions", label: "Sessions", match: (p: string) => p.startsWith("/sessions") },
 ];
