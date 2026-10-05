@@ -142,6 +142,7 @@ export function GameReview({ data }: { data: ReviewData }) {
   };
 
   const pos = current > 0 ? plies[current - 1] : undefined;
+  const next = plies[current]; // the move actually played from this position
   const fen = pos?.fenAfter ?? startFen;
   const whitePct = pos ? pos.whitePct : null;
 
@@ -195,11 +196,7 @@ export function GameReview({ data }: { data: ReviewData }) {
                 orientation={myColor}
                 lastMove={pos ? { from: pos.from, to: pos.to } : null}
                 badge={pos?.label ? { square: pos.to, label: pos.label } : null}
-                arrows={
-                  pos && pos.severity && pos.bestUci && pos.bestUci !== `${pos.from}${pos.to}`
-                    ? [{ startSquare: pos.bestUci.slice(0, 2), endSquare: pos.bestUci.slice(2, 4), color: "rgba(76, 140, 60, 0.85)" }]
-                    : []
-                }
+                arrows={nextArrows(next)}
                 label={pos ? `Position after ${moveLabel(pos)}` : "Starting position"}
               />
             </div>
@@ -223,6 +220,7 @@ export function GameReview({ data }: { data: ReviewData }) {
             Next mistake
           </button>
         </div>
+        <ArrowLegend next={next} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <MoveList rows={moveRows} current={current} onSelect={go} listRef={listRef} />
@@ -328,10 +326,10 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
       data-ply={p.ply}
       onClick={() => onSelect(p.ply)}
       aria-current={active ? "step" : undefined}
-      className={`min-h-[30px] justify-self-start rounded-[4px] px-1.5 text-left ${active ? "bg-gold text-[color:var(--on-gold)]" : "text-ink hover:bg-chip"}`}
+      className={`inline-flex min-h-[30px] items-center justify-self-start rounded-[4px] px-1.5 text-left ${active ? "bg-gold text-[color:var(--on-gold)]" : "text-ink hover:bg-chip"}`}
     >
       <span className="inline-flex items-center gap-1.5">
-        {p.label && p.label !== "good" && p.label !== "excellent" ? <MoveIcon label={p.label} size={16} /> : <span className="inline-block w-4" />}
+        {p.label && p.label !== "good" && p.label !== "excellent" ? <MoveIcon label={p.label} size={20} /> : <span className="inline-block h-5 w-5" aria-hidden="true" />}
         {p.san}
       </span>
     </button>
@@ -359,7 +357,7 @@ function MoveCounts({ counts }: { counts: ReviewData["counts"] }) {
               <tr key={l.id}>
                 <th scope="row" className="py-[3px] text-left font-semibold text-body2">
                   <span className="inline-flex items-center gap-2">
-                    <MoveIcon label={l.id} size={17} />
+                    <MoveIcon label={l.id} size={21} />
                     {l.name}
                   </span>
                 </th>
@@ -427,8 +425,8 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
       {info?.missedMate && <p className="mt-3 text-sm font-semibold text-ink">You had a forced checkmate here.</p>}
       {ply.bestUci && ply.bestUci !== `${ply.from}${ply.to}` && (
         <p className="mt-3 flex items-center gap-2 text-sm text-body2">
-          <span className="inline-block h-1.5 w-6 rounded-full bg-[rgba(76,140,60,0.85)]" aria-hidden="true" />
-          The green arrow shows the move the engine wanted instead.
+          <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
+          Step back one move to compare: yellow is what was played, green is what the engine wanted.
         </p>
       )}
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-line-soft pt-3 text-sm text-body2">
@@ -449,6 +447,48 @@ function CoachCard({ ply, info, data }: { ply?: ReviewPly; info?: CoachInfo; dat
         </p>
       )}
     </section>
+  );
+}
+
+const NEXT_ARROW = "rgba(246, 190, 40, 0.9)";
+const BEST_ARROW = "rgba(76, 175, 80, 0.9)";
+
+/** From the position on the board: yellow for the move actually played next, green for the engine's best move here. */
+function nextArrows(next: ReviewPly | undefined) {
+  if (!next) return [];
+  const played = `${next.from}${next.to}`;
+  const best = next.bestUci && next.bestUci.slice(0, 4) !== played ? next.bestUci : null;
+  const arrows = [{ startSquare: next.from, endSquare: next.to, color: next.bestUci?.slice(0, 4) === played ? BEST_ARROW : NEXT_ARROW }];
+  if (best) arrows.push({ startSquare: best.slice(0, 2), endSquare: best.slice(2, 4), color: BEST_ARROW });
+  return arrows;
+}
+
+function ArrowLegend({ next }: { next: ReviewPly | undefined }) {
+  if (!next) return null;
+  const matched = next.bestUci?.slice(0, 4) === `${next.from}${next.to}`;
+  const who = next.isMine ? "You" : "They";
+  return (
+    <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[0.8125rem] text-body2" aria-live="polite">
+      {matched ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
+          {who} played the engine&apos;s best move next: <span className="mono text-ink">{next.san}</span>
+        </span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: NEXT_ARROW }} aria-hidden="true" />
+            {who} played next: <span className="mono text-ink">{next.san}</span>
+          </span>
+          {next.bestUci && (
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
+              Engine&apos;s best move here
+            </span>
+          )}
+        </>
+      )}
+    </p>
   );
 }
 
