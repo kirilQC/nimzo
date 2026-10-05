@@ -32,7 +32,7 @@ export type ExplorerGame = {
 type SortKey = "end" | "opponent" | "oppRating" | "myRating" | "result" | "moves" | "accuracy" | "opening";
 const PAGE = 50;
 const CLASS_ORDER = ["bullet", "blitz", "rapid", "daily", "other"];
-const CLASS_COLOR: Record<string, string> = { bullet: "#9E2B25", blitz: "#C9832E", rapid: "#4E7A3A", daily: "#3F6E9A", other: "#7A6A58" };
+const CLASS_COLOR: Record<string, string> = { bullet: "#FF7769", blitz: "#FFA459", rapid: "#8FD3A8", daily: "#7FB5E6", other: "#A39A7C" };
 const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
 const RESULT_RANK = { win: 2, draw: 1, loss: 0 } as const;
 
@@ -257,14 +257,14 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
                   </span>
                 </td>
                 <td className="whitespace-nowrap font-semibold text-ink">
-                  <span className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full border border-line align-middle ${g.color === "white" ? "bg-white" : "bg-[#2b2724]"}`} title={`You played ${g.color}`} aria-label={`You played ${g.color}`} />
+                  <span className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full border border-line align-middle ${g.color === "white" ? "bg-white" : "bg-[#111]"}`} title={`You played ${g.color}`} aria-label={`You played ${g.color}`} />
                   <Link href={`/games/${g.id}`} className="text-ink no-underline hover:underline" title={g.status === "imported" ? "Open and analyze this game" : "Review this game"}>
                     <PlayerBadge name={g.opponent} look={g.oppLook ?? undefined} size={24} />
                   </Link>
                 </td>
                 <td className="mono text-right text-body2">{g.oppRating ?? "–"}</td>
                 <td className="mono text-right text-ink">{g.myRating ?? "–"}</td>
-                <td className={g.result === "win" ? "font-semibold text-[#4E7A3A]" : g.result === "loss" ? "font-semibold text-[color:var(--blunder-bg)]" : "text-body2"}>{RESULT_TEXT[g.result]}</td>
+                <td className={g.result === "win" ? "font-semibold text-good" : g.result === "loss" ? "font-semibold text-[color:var(--blunder-bg)]" : "text-body2"}>{RESULT_TEXT[g.result]}</td>
                 <td className="text-body2">{g.ending}</td>
                 <td className="mono text-right text-body2">{g.moves ?? "–"}</td>
                 <td className="max-w-[150px] truncate text-walnut" title={[g.eco, g.opening].filter(Boolean).join(" ")}>

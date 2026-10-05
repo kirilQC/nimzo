@@ -2,10 +2,10 @@ import type { ReviewSummary } from "./GameReview";
 import { MoveText } from "./MoveText";
 
 const VERDICT: Record<string, { label: string; className: string }> = {
-  excellent: { label: "Excellent game", className: "bg-[#e3efd6] text-[#3d6b22]" },
-  good: { label: "Good game", className: "bg-[#e8f0dc] text-[#4e7a3a]" },
-  mixed: { label: "Mixed game", className: "bg-[#f6ecd2] text-[#7a5a14]" },
-  rough: { label: "Rough game", className: "bg-[#f6dcd6] text-[#8a2c22]" },
+  excellent: { label: "Excellent game", className: "bg-[color:var(--good-bg)] text-good" },
+  good: { label: "Good game", className: "bg-[color:var(--good-bg)] text-good" },
+  mixed: { label: "Mixed game", className: "bg-[color:var(--inacc-bg)] text-[color:var(--inacc-fg)]" },
+  rough: { label: "Rough game", className: "bg-[color:var(--bad-bg)] text-[color:var(--bad-fg)]" },
 };
 
 /** Arthur's game summary in a fixed shape: story, how the advantage moved, where you fell short, what went well, the one lesson. */
@@ -63,7 +63,7 @@ export function GameSummary({ summary, onJump }: { summary: ReviewSummary; onJum
       {!!wentWell.length && (
         <div className="mt-4">
           <h3 className="eyebrow mb-1.5">What went well</h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-[#4e7a3a]">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-body2 marker:text-good">
             {wentWell.map((b, i) => (
               <li key={i}>
                 <MoveText text={b} onJump={onJump} />

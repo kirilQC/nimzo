@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useAnalysis } from "@/components/analysis/AnalysisProvider";
 
 /** Throws away this game's analysis and runs the engine, tagging and Arthur's review again. */
-export function ReanalyzeButton({ gameId }: { gameId: string }) {
+export function ReanalyzeButton({ gameId, className = "btn btn-secondary" }: { gameId: string; className?: string }) {
   const { enqueue } = useAnalysis();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -31,8 +31,8 @@ export function ReanalyzeButton({ gameId }: { gameId: string }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <button type="button" className="btn btn-secondary" onClick={() => void run()} disabled={busy}>
+    <span className="inline-flex w-full flex-col items-stretch gap-1">
+      <button type="button" className={className} onClick={() => void run()} disabled={busy}>
         {busy ? "Resetting…" : "Reanalyze"}
       </button>
       {error && (

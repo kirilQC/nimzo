@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Source_Sans_3, IBM_Plex_Mono } from "next/font/google";
+import { Manrope, Mulish, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({ subsets: ["latin"], weight: ["600"], variable: "--font-fraunces", display: "swap" });
-const sourceSans = Source_Sans_3({ subsets: ["latin"], weight: ["400", "600"], variable: "--font-source-sans", display: "swap" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["500"], variable: "--font-plex-mono", display: "swap" });
+const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-manrope", display: "swap" });
+const mulish = Mulish({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-mulish", display: "swap" });
+const barlowC = Barlow_Condensed({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-barlow-c", display: "swap" });
 
 const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -18,11 +18,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const viewport: Viewport = { themeColor: "#2A231B" };
+export const viewport: Viewport = { themeColor: "#0d241b" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${sourceSans.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${manrope.variable} ${mulish.variable} ${barlowC.variable}`}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

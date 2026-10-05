@@ -11,8 +11,8 @@ type Tag = ProfileStats["weaknesses"][number];
 type Condition = ProfileStats["conditions"][number];
 
 const TREND: Record<string, { text: string; className: string }> = {
-  improving: { text: "Improving", className: "bg-[#e8f0dc] text-[#3d6b22]" },
-  worse: { text: "Getting worse", className: "bg-[#f6dcd6] text-[#8a2c22]" },
+  improving: { text: "Improving", className: "bg-[color:var(--good-bg)] text-good" },
+  worse: { text: "Getting worse", className: "bg-[color:var(--bad-bg)] text-[color:var(--bad-fg)]" },
   steady: { text: "Steady", className: "bg-chip text-body2" },
   new: { text: "Recent", className: "bg-chip text-body2" },
 };
@@ -69,7 +69,7 @@ export function ProfileView({ stats, profile, lessonTitles }: { stats: ProfileSt
                 </div>
                 <p className="mt-2 text-body2">{w.explanation}</p>
                 <p className="mt-2 text-sm font-semibold text-ink">{w.evidence}</p>
-                <p className="mt-2 rounded-[8px] bg-[#eef5e6] px-3 py-2 text-sm text-[#2f5419]">
+                <p className="mt-2 rounded-[8px] bg-[color:var(--good-bg)] px-3 py-2 text-sm text-good">
                   <span className="font-semibold">The fix: </span>
                   {w.fix}
                 </p>
@@ -134,8 +134,8 @@ export function ProfileView({ stats, profile, lessonTitles }: { stats: ProfileSt
         {profile && (
           <ul className="mb-4 grid gap-3 md:grid-cols-2">
             {profile.strengths.map((s, i) => (
-              <li key={i} className="rounded-[10px] bg-[#eef5e6] p-4">
-                <h3 className="font-semibold text-[#2f5419]">{s.title}</h3>
+              <li key={i} className="rounded-[10px] bg-[color:var(--good-bg)] p-4">
+                <h3 className="font-semibold text-good">{s.title}</h3>
                 <p className="mt-1 text-sm text-body2">{s.explanation}</p>
                 <p className="mt-1 text-sm font-semibold text-ink">{s.evidence}</p>
               </li>
@@ -144,7 +144,7 @@ export function ProfileView({ stats, profile, lessonTitles }: { stats: ProfileSt
         )}
         <ul className="flex flex-wrap gap-2">
           {stats.strengths.slice(0, 10).map((t) => (
-            <li key={t.id} className="chip bg-[#eef5e6] text-[#3d6b22]">
+            <li key={t.id} className="chip bg-[color:var(--good-bg)] text-good">
               {t.label} · <span className="mono">{t.games_pct}%</span> of games
             </li>
           ))}
@@ -268,8 +268,8 @@ export function ProfileView({ stats, profile, lessonTitles }: { stats: ProfileSt
         <div className="mt-4">
           <RatingChart
             series={[
-              { id: "acc", label: "Accuracy", color: "#4E7A3A", points: stats.by_month.filter((m) => m.accuracy !== null).map((m) => ({ t: Date.parse(`${m.month}-15`), rating: Math.round(m.accuracy!) })) },
-              { id: "blunders", label: "Blunders a game ×10", color: "#9E2B25", points: stats.by_month.filter((m) => m.blunders_per_game !== null).map((m) => ({ t: Date.parse(`${m.month}-15`), rating: Math.round(m.blunders_per_game! * 10) })) },
+              { id: "acc", label: "Accuracy", color: "#8FD3A8", points: stats.by_month.filter((m) => m.accuracy !== null).map((m) => ({ t: Date.parse(`${m.month}-15`), rating: Math.round(m.accuracy!) })) },
+              { id: "blunders", label: "Blunders a game ×10", color: "#FF7769", points: stats.by_month.filter((m) => m.blunders_per_game !== null).map((m) => ({ t: Date.parse(`${m.month}-15`), rating: Math.round(m.blunders_per_game! * 10) })) },
             ].filter((s) => s.points.length > 1)}
           />
         </div>
@@ -316,7 +316,7 @@ function BulletList({ title, items, tone }: { title: string; items: string[]; to
   return (
     <div>
       <p className="eyebrow mb-1">{title}</p>
-      <ul className={`list-disc space-y-1 pl-5 text-body2 ${tone === "good" ? "marker:text-[#4e7a3a]" : "marker:text-[color:var(--blunder-bg)]"}`}>
+      <ul className={`list-disc space-y-1 pl-5 text-body2 ${tone === "good" ? "marker:text-good" : "marker:text-[color:var(--blunder-bg)]"}`}>
         {items.map((x, i) => (
           <li key={i}>{x}</li>
         ))}
@@ -357,7 +357,7 @@ function ConditionBars({ title, rows, base }: { title: string; rows: Condition[]
               </span>
               <span className="relative h-3 rounded-full bg-chip">
                 <span
-                  className={`absolute inset-y-0 left-0 rounded-full ${above ? "bg-[color:var(--blunder-bg)]" : "bg-[#4e7a3a]"} ${r.significant ? "opacity-100" : "opacity-35"}`}
+                  className={`absolute inset-y-0 left-0 rounded-full ${above ? "bg-[color:var(--blunder-bg)]" : "bg-[color:var(--good-strong)]"} ${r.significant ? "opacity-100" : "opacity-35"}`}
                   style={{ width: `${w}%` }}
                 />
                 <span className="absolute inset-y-[-3px] w-px bg-ink/60" style={{ left: `${(base / max) * 100}%` }} aria-hidden="true" />

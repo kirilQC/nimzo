@@ -177,9 +177,9 @@ export function GameReview({ data }: { data: ReviewData }) {
   const selectedCoach = pos && pos.isMine && pos.severity ? coach[pos.ply] : undefined;
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[480px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)] 2xl:grid-cols-[680px_minmax(0,1fr)]">
-      {/* Board column */}
-      <div className="min-w-0 space-y-4">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+      {/* Board card: the board, the controls, then the score sheet and counts underneath */}
+      <section aria-label="Board" className="card min-w-0 space-y-4 p-4 sm:p-5">
         <div
           ref={boardRef}
           tabIndex={0}
@@ -224,19 +224,11 @@ export function GameReview({ data }: { data: ReviewData }) {
           </button>
         </div>
 
-        <section className="card" aria-labelledby="eval-h">
-          <h2 id="eval-h" className="eyebrow mb-3">
-            Evaluation
-          </h2>
-          <EvalGraph
-            points={plies.map((p) => ({ ply: p.ply, whitePct: p.whitePct, severity: p.severity, isMine: p.isMine }))}
-            current={current}
-            onSelect={go}
-          />
-        </section>
-
-        {data.counts && <MoveSummary data={data} counts={data.counts} />}
-      </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <MoveList rows={moveRows} current={current} onSelect={go} listRef={listRef} />
+          <MoveCounts counts={data.counts} />
+        </div>
+      </section>
 
       {/* Coach, ask and moves column */}
       <div className="min-w-0 space-y-4">
@@ -286,32 +278,44 @@ export function GameReview({ data }: { data: ReviewData }) {
 
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
-        <section className="card px-0 pb-2" aria-labelledby="moves-h">
-          <h2 id="moves-h" className="eyebrow mb-2 px-5">
-            Moves
+        <section className="card" aria-labelledby="eval-h">
+          <h2 id="eval-h" className="mb-3 text-[0.9375rem]">
+            How the game went
           </h2>
-          <ol ref={listRef} className="max-h-[420px] overflow-y-auto">
-            {moveRows.map((row) => {
-              const mine = myColor === "white" ? row.w : row.b;
-              const sev = mine?.isMine ? mine.severity : null;
-              return (
-                <li
-                  key={row.no}
-                  className={`grid grid-cols-[2.75rem_1fr_1fr_6.5rem] items-center gap-1 border-t border-line-soft px-5 py-0.5 first:border-t-0 ${
-                    sev === "blunder" ? "row-tint" : ""
-                  }`}
-                >
-                  <span className="mono text-sm text-muted">{row.no}.</span>
-                  <MoveCell p={row.w} current={current} onSelect={go} />
-                  <MoveCell p={row.b} current={current} onSelect={go} />
-                  <span className="text-right">{sev && <SeverityChip severity={sev} />}</span>
-                </li>
-              );
-            })}
-          </ol>
+          <EvalGraph
+            points={plies.map((p) => ({ ply: p.ply, whitePct: p.whitePct, severity: p.severity, isMine: p.isMine }))}
+            current={current}
+            onSelect={go}
+          />
         </section>
+
       </div>
     </div>
+  );
+}
+
+type MoveRow = { no: number; w?: ReviewPly; b?: ReviewPly };
+
+/** The score sheet: one row per full move, the label icon beside each move, scrolling inside its own panel. */
+function MoveList({ rows, current, onSelect, listRef }: { rows: MoveRow[]; current: number; onSelect: (ply: number) => void; listRef: React.RefObject<HTMLOListElement | null> }) {
+  return (
+    <section className="panel-data min-w-0" aria-labelledby="moves-h">
+      <h2 id="moves-h" className="label-data mb-1.5">
+        Moves
+      </h2>
+      <ol ref={listRef} className="mono max-h-[360px] overflow-y-auto text-[0.9375rem]">
+        {rows.map((row) => {
+          const blunder = row.w?.isMine ? row.w.severity === "blunder" : row.b?.isMine ? row.b.severity === "blunder" : false;
+          return (
+            <li key={row.no} className={`grid grid-cols-[1.75rem_1fr_1fr] items-center gap-1 rounded-[4px] px-1.5 ${blunder ? "row-tint" : ""}`}>
+              <span className="text-muted">{row.no}</span>
+              <MoveCell p={row.w} current={current} onSelect={onSelect} />
+              <MoveCell p={row.b} current={current} onSelect={onSelect} />
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -324,9 +328,7 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
       data-ply={p.ply}
       onClick={() => onSelect(p.ply)}
       aria-current={active ? "step" : undefined}
-      className={`mono min-h-[34px] justify-self-start rounded-[6px] px-2 text-left text-[0.9375rem] ${
-        active ? "bg-chip text-ink" : "text-body2 hover:bg-chip/60"
-      }`}
+      className={`min-h-[30px] justify-self-start rounded-[4px] px-1.5 text-left ${active ? "bg-gold text-[color:var(--on-gold)]" : "text-ink hover:bg-chip"}`}
     >
       <span className="inline-flex items-center gap-1.5">
         {p.label && p.label !== "good" && p.label !== "excellent" ? <MoveIcon label={p.label} size={16} /> : <span className="inline-block w-4" />}
@@ -336,54 +338,40 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
   );
 }
 
-/** chess.com's review tally: every label, your count and your opponent's, with accuracies. */
-function MoveSummary({ data, counts }: { data: ReviewData; counts: NonNullable<ReviewData["counts"]> }) {
-  const me = data.players?.me ?? "You";
-  const opp = data.players?.opponent ?? "Opponent";
-  const [left, right] = data.myColor === "white" ? [me, opp] : [opp, me];
-  const [lc, rc] = data.myColor === "white" ? [counts.me, counts.opponent] : [counts.opponent, counts.me];
-  const [la, ra] = data.myColor === "white" ? [data.accuracy, data.accuracyOpponent] : [data.accuracyOpponent, data.accuracy];
+/** chess.com's review tally: every label with your count (gold) and your opponent's. */
+function MoveCounts({ counts }: { counts: ReviewData["counts"] }) {
   return (
-    <section className="card" aria-labelledby="summary-h">
-      <h2 id="summary-h" className="eyebrow mb-3">
-        Move summary
+    <section className="panel-data min-w-0" aria-labelledby="counts-h">
+      <h2 id="counts-h" className="label-data mb-1.5">
+        Counts · you / them
       </h2>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-muted">
-            <th className="pb-2 text-left font-normal">
-              <span className="sr-only">Label</span>
-            </th>
-            <th className="pb-2 text-center font-semibold text-ink">{left}</th>
-            <th className="pb-2" aria-hidden="true" />
-            <th className="pb-2 text-center font-semibold text-ink">{right}</th>
-          </tr>
-          <tr>
-            <th className="pb-2 text-left font-normal text-muted">Accuracy</th>
-            <td className="mono pb-2 text-center text-lg text-ink">{la !== null ? la.toFixed(1) : "–"}</td>
-            <td />
-            <td className="mono pb-2 text-center text-lg text-ink">{ra !== null ? ra.toFixed(1) : "–"}</td>
-          </tr>
-        </thead>
-        <tbody>
-          {MOVE_LABELS.map((l) => (
-            <tr key={l.id} className="border-t border-line-soft">
-              <th scope="row" className="py-1.5 text-left font-semibold text-ink">
-                {l.name}
-              </th>
-              <td className="mono py-1.5 text-center font-bold" style={{ color: l.color }}>
-                {lc[l.id]}
-              </td>
-              <td className="py-1.5 text-center">
-                <MoveIcon label={l.id} size={22} />
-              </td>
-              <td className="mono py-1.5 text-center font-bold" style={{ color: l.color }}>
-                {rc[l.id]}
-              </td>
+      {counts ? (
+        <table className="mono w-full text-[0.9375rem]">
+          <thead className="sr-only">
+            <tr>
+              <th scope="col">Label</th>
+              <th scope="col">You</th>
+              <th scope="col">Them</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {MOVE_LABELS.map((l) => (
+              <tr key={l.id}>
+                <th scope="row" className="py-[3px] text-left font-semibold text-body2">
+                  <span className="inline-flex items-center gap-2">
+                    <MoveIcon label={l.id} size={17} />
+                    {l.name}
+                  </span>
+                </th>
+                <td className="w-8 text-right text-gold">{counts.me[l.id]}</td>
+                <td className="w-8 text-right text-muted">{counts.opponent[l.id]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-sm text-muted">Counts appear once the engine has been through the game.</p>
+      )}
     </section>
   );
 }

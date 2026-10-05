@@ -8,12 +8,19 @@ import { T } from "@/lib/supabase/tables";
 import { SAMPLE_PGN } from "@/lib/chess/sample";
 import { formatDate } from "@/lib/format";
 import { describeEnding } from "@/lib/chess/ending";
-import { ReanalyzeButton } from "@/components/review/ReanalyzeButton";
+import { GameReadouts, type Readouts } from "@/components/review/GameReadouts";
 import { env } from "@/lib/env";
 import { getPlayers } from "@/lib/chesscom/players";
-import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
+import type { PlayerLook } from "@/components/PlayerBadge";
 
 const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
+const TIME_CLASS = { rapid: "Rapid", blitz: "Blitz", bullet: "Bullet", daily: "Daily" } as Record<string, string>;
+
+/** "Italian Game: Two Knights Defense" → "Italian" for the compact readout. */
+function shortOpening(name: string | null): string | null {
+  if (!name) return null;
+  return (name.split(":")[0] ?? name).replace(/\s+(Game|Opening|Defense|Defence|Attack)$/i, "").trim() || name;
+}
 
 function timeLabel(tc: string | null, timeClass: string | null): string | null {
   const m = tc ? /^(\d+)(?:\+(\d+))?$/.exec(tc) : null;
@@ -38,10 +45,20 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
 
   let header: Header;
   let data: ReviewData;
+  let readouts: Readouts;
 
   if (id === "sample") {
     data = buildReviewData({ gameId: null, pgn: SAMPLE_PGN, myColor: "white", status: "imported", error: null, positions: [] });
-    header = { title: "You (White) vs shilling_fan", meta: ["Sample", "Loss", "10 min rapid", "Italian Game: Blackburne–Shilling Gambit"], ending: null, gameId: null };
+    header = { title: "You (White) vs shilling_fan", meta: ["Sample", "Loss", "10 min rapid", "Italian Game: Blackburne Shilling Gambit"], ending: null, gameId: null };
+    readouts = {
+      gameId: null,
+      opponent: null,
+      me: null,
+      result: null,
+      game: { main: "Sample · 10 min · Italian", sub: "Blackburne Shilling Gambit" },
+      accuracy: { mine: data.accuracy, theirs: data.accuracyOpponent, chesscom: null },
+      fallbackTitle: "You vs shilling_fan",
+    };
   } else {
     if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
     const db = await getDb();
@@ -102,33 +119,34 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
         opp: { name: game.opponent, rating: game.opponent_rating, look: looks.get(game.opponent.toLowerCase()) },
       },
     };
+    const result = game.result as "win" | "loss" | "draw";
+    const tc = timeLabel(game.time_control, null);
+    readouts = {
+      gameId: game.id,
+      opponent: { name: game.opponent, rating: game.opponent_rating, look: looks.get(game.opponent.toLowerCase()), color: color === "White" ? "Black" : "White" },
+      me: { rating: game.my_rating, color },
+      result: { text: result === "draw" ? ending.short : `${RESULT_TEXT[result]} · ${ending.short}`, tone: result },
+      game: {
+        main: [`${moves} moves`, tc, shortOpening(game.opening_name)].filter(Boolean).join(" · "),
+        sub: [game.time_class ? (TIME_CLASS[game.time_class] ?? game.time_class) : null, game.opening_name, formatDate(game.end_time, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · "),
+      },
+      accuracy: {
+        mine: game.accuracy_ours === null ? null : Number(game.accuracy_ours),
+        theirs: data.accuracyOpponent,
+        chesscom: game.accuracy_chesscom === null ? null : Number(game.accuracy_chesscom),
+      },
+    };
   }
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <p className="mb-3 text-sm">
         <Link href="/games" className="arrow-link font-normal">
           ← All games
         </Link>
-        {header.players ? (
-          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[1.375rem]">
-            <PlayerBadge name={header.players.me.name} rating={header.players.me.rating} look={header.players.me.look} size={34} />
-            <span className="text-base font-normal text-muted">({header.players.me.color}) vs</span>
-            <PlayerBadge name={header.players.opp.name} rating={header.players.opp.rating} look={header.players.opp.look} size={34} />
-          </h1>
-        ) : (
-          <h1 className="text-[1.75rem]">{header.title}</h1>
-        )}
-        <p className="text-sm text-muted">
-          {header.ending && <span className="font-semibold text-ink">{header.ending} · </span>}
-          {header.meta.join(" · ")}
-        </p>
-        {header.gameId && (
-          <span className="ml-auto">
-            <ReanalyzeButton gameId={header.gameId} />
-          </span>
-        )}
-      </div>
+        {header.ending && <span className="sr-only">. {header.ending}. {header.meta.join(", ")}</span>}
+      </p>
+      <GameReadouts r={readouts} />
       <GameReview data={Number.isInteger(plyParam) && plyParam > 0 ? { ...data, initialPly: plyParam } : data} />
     </div>
   );

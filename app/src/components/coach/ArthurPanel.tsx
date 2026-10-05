@@ -167,16 +167,16 @@ export function ArthurPanel({
 
   return (
     <section className="card p-0" aria-labelledby="arthur-h">
-      <div className="flex gap-4 p-4">
-        <div className="relative w-[150px] shrink-0 self-start overflow-hidden rounded-[10px] border-2 border-brass">
+      <div className="flex gap-4 p-5">
+        <div className="relative h-[104px] w-[104px] shrink-0 self-start overflow-hidden rounded-full border-2 border-brass">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             key={shown}
             src={expressionSrc(shown)}
             alt={`${COACH.name}: ${EXPRESSIONS[shown]}`}
-            width={150}
-            height={188}
-            className="arthur-face block h-[188px] w-full object-cover"
+            width={104}
+            height={104}
+            className="arthur-face block h-full w-full object-cover object-top"
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -186,7 +186,7 @@ export function ArthurPanel({
             </h2>
             {asking && <span className="text-sm text-muted">thinking…</span>}
           </div>
-          <p className="serif mt-2 text-[1.0625rem] leading-relaxed text-ink" aria-live="polite">
+          <p className="mt-2 text-[1.1875rem] font-semibold leading-relaxed text-ink" aria-live="polite">
             {bubble ? <MoveText text={bubble} onJump={onJump} /> : placeholder}
           </p>
           {moveTags.length > 0 && (
@@ -204,11 +204,11 @@ export function ArthurPanel({
                       className={`rounded-full border px-2.5 py-1 text-[0.8125rem] font-semibold transition-colors ${
                         t.polarity === "good"
                           ? active
-                            ? "border-[#4e7a3a] bg-[#4e7a3a] text-white"
-                            : "border-[#bcd3a8] bg-[#eef5e6] text-[#3d6b22] hover:bg-[#e2eed6]"
+                            ? "border-[color:var(--good-strong)] bg-[color:var(--good-strong)] text-white"
+                            : "border-[color:var(--good-line)] bg-[color:var(--good-bg)] text-good hover:bg-[color:var(--good-line)]"
                           : active
                             ? "border-[color:var(--blunder-bg)] bg-[color:var(--blunder-bg)] text-white"
-                            : "border-[#e6c3bd] bg-[#fbeeeb] text-[#8a2c22] hover:bg-[#f6e0db]"
+                            : "border-[color:var(--bad-line)] bg-[color:var(--bad-bg)] text-[color:var(--bad-fg)] hover:bg-[color:var(--bad-line)]"
                       }`}
                     >
                       {t.label}

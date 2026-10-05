@@ -1,48 +1,60 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Nimzo design tokens. Warm and classic: parchment, walnut, brass.
-   Light-only by design (the brief specifies one palette).
+   Nimzo design tokens. Club felt: one deep green everywhere, gold accents,
+   cockpit style data panels. Dark by design.
    --------------------------------------------------------------------------- */
 :root {
-  --parchment: #f5efe3;
-  --card: #fbf8f1;
-  --border: #dccfb8;
-  --border-soft: #e5dac6;
-  --chip: #eadfcb;
+  --parchment: #0d241b; /* page */
+  --card: #132e23;
+  --border: #24402f;
+  --border-soft: #1d3a2c;
+  --chip: #1b3a2d;
 
-  --ink: #2a231b;
-  --muted: #6b5d4b;
-  --body-2: #4e4335;
+  --ink: #efe6cc;
+  --muted: #a39a7c;
+  --body-2: #cfc6a8;
 
-  --walnut: #5c3d24;
-  --walnut-hover: #4a3019;
-  --brass: #c9a063;
-  --panel: #2a231b;
-  --panel-text: #f5efe3;
-  --panel-text-2: #d9c7a6;
+  --walnut: #e3c35a; /* primary action: gold */
+  --walnut-hover: #f0d47a;
+  --on-gold: #0d241b;
+  --brass: #e3c35a;
+  --gold-rule: #6b5a22;
+  --nav-muted: #b9ad8c;
+  --panel: #0f2a1f;
+  --panel-text: #efe6cc;
+  --panel-text-2: #cfc6a8;
 
   --sq-light: #ead7b5;
   --sq-dark: #a9784f;
   --hl-light: #e3b66a;
   --hl-dark: #c08a3e;
 
-  --blunder-bg: #9e2b25;
+  --blunder-bg: #d9604a;
   --blunder-fg: #ffffff;
-  --mistake-bg: #f2c9a0;
-  --mistake-fg: #6e340c;
-  --inacc-bg: #f0dfb0;
-  --inacc-fg: #5e4508;
-  --miss-bg: #f6c4bd;
-  --miss-fg: #7a1d14;
-  --win: #3d6b35;
-  --loss: #9e2b25;
+  --mistake-bg: #3d2a17;
+  --mistake-fg: #ffb27a;
+  --inacc-bg: #3a3214;
+  --inacc-fg: #f7d774;
+  --miss-bg: #3a2420;
+  --miss-fg: #ffb4a2;
+  --win: #8fd3a8;
+  --loss: #ff7a62;
 
-  --r-card: 10px;
-  --r-btn: 8px;
-  --r-chip: 6px;
+  --good: #8fd3a8;
+  --good-bg: #173a2b;
+  --good-line: #2f5e47;
+  --good-strong: #3f8a62;
+  --bad-bg: #3a2420;
+  --bad-fg: #ffb4a2;
+  --bad-line: #5a3129;
+  --bad-tint: #2a2219;
 
-  color-scheme: light;
+  --r-card: 14px;
+  --r-btn: 999px;
+  --r-chip: 999px;
+
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -59,9 +71,12 @@
   --color-panel: var(--panel);
   --color-panel-text: var(--panel-text);
   --color-panel-text-2: var(--panel-text-2);
-  --font-serif: var(--font-fraunces), Georgia, serif;
-  --font-sans: var(--font-source-sans), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-serif: var(--font-manrope), system-ui, sans-serif; /* headings: Manrope heavy */
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-mono: var(--font-barlow-c), ui-monospace, monospace; /* numbers and moves: cockpit condensed */
+  --font-nav: var(--font-mulish), system-ui, sans-serif;
+  --color-gold: var(--brass);
+  --color-good: var(--good);
 }
 
 @layer base {
@@ -79,15 +94,15 @@ body {
 
 h1, h2, h3, .serif {
   font-family: var(--font-serif);
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 h1 { font-size: 1.875rem; line-height: 1.2; }
 h2 { font-size: 1.25rem; line-height: 1.3; }
 h3 { font-size: 1.0625rem; line-height: 1.35; }
 
-.mono { font-family: var(--font-mono); font-weight: 500; font-feature-settings: "tnum"; }
+.mono { font-family: var(--font-mono); font-weight: 600; font-feature-settings: "tnum"; }
 
 a { color: inherit; }
 .link {
@@ -148,14 +163,14 @@ a { color: inherit; }
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-primary { background: var(--walnut); color: var(--card); }
+.btn-primary { background: var(--walnut); color: var(--on-gold); font-weight: 700; }
 .btn-primary:hover:not(:disabled) { background: var(--walnut-hover); }
-.btn-secondary { background: var(--card); color: var(--walnut); border-color: var(--border); }
+.btn-secondary { background: var(--chip); color: var(--ink); border-color: transparent; }
 .btn-secondary:hover:not(:disabled) { background: var(--chip); }
-.btn-ghost { background: transparent; color: var(--walnut); }
+.btn-ghost { background: transparent; color: var(--brass); }
 .btn-ghost:hover:not(:disabled) { background: var(--chip); }
 .btn-icon { width: 44px; padding: 0; }
-.card-dark .btn-secondary { background: transparent; color: var(--panel-text); border-color: #5a4c3a; }
+.card-dark .btn-secondary { background: transparent; color: var(--panel-text); border-color: var(--border); }
 
 /* Chips ------------------------------------------------------------------- */
 .chip {
@@ -279,7 +294,33 @@ a { color: inherit; }
   .btn-sm { min-height: 36px; padding: 0 0.875rem; font-size: 0.875rem; }
   .btn-light { background: var(--card); color: var(--ink); border-color: var(--border); }
   .btn-light:hover:not(:disabled) { background: var(--chip); }
-  .row-tint { background: #f3e6d4; }
+  .row-tint { background: #2b3a22; }
+  /* Cockpit data panels (moves, counts, readouts) */
+  .panel-data {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem;
+  }
+  .btn-gold-outline {
+    background: transparent;
+    color: var(--brass);
+    border-color: var(--brass);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .btn-gold-outline:hover:not(:disabled) { background: rgba(227, 195, 90, 0.1); }
+  .label-data {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
 }
 
 @keyframes arthur-fade { from { opacity: 0.35; } to { opacity: 1; } }

@@ -12,43 +12,42 @@ const LINKS = [
   { href: "/sessions", label: "Sessions", match: (p: string) => p.startsWith("/sessions") },
 ];
 
+/** Club style header: tabs either side of the round Nimzo badge, a gold double rule underneath. */
 export function Nav({ username }: { username: string }) {
   const pathname = usePathname();
-  return (
-    <header className="border-b border-line bg-card">
-      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-8 gap-y-1 px-6 py-3 lg:px-10">
-        <Link href="/" className="flex items-center gap-2.5 no-underline" aria-label="Nimzo home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/badge.svg" width={40} height={40} alt="" />
-          <span className="serif text-[1.5rem] leading-none">Nimzo</span>
+  const link = (l: (typeof LINKS)[number]) => {
+    const active = l.match(pathname);
+    return (
+      <li key={l.href}>
+        <Link
+          href={l.href}
+          aria-current={active ? "page" : undefined}
+          className={`inline-flex min-h-[44px] items-center border-b font-[family-name:var(--font-nav)] text-[0.8125rem] font-bold uppercase tracking-[0.18em] no-underline transition-colors ${
+            active ? "border-gold text-gold" : "border-transparent text-[color:var(--nav-muted)] hover:text-ink"
+          }`}
+        >
+          {l.label}
         </Link>
-        <nav aria-label="Main">
-          <ul className="flex gap-1">
-            {LINKS.map((l) => {
-              const active = l.match(pathname);
-              return (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`inline-flex min-h-[44px] items-center rounded-[8px] px-3.5 text-[0.9375rem] font-semibold no-underline ${
-                      active ? "bg-chip text-ink" : "text-body2 hover:bg-chip/60"
-                    }`}
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-        <div className="ml-auto flex items-center gap-4 text-[0.8125rem] text-muted">
-          <AnalysisStatus />
-          <span>
-            chess.com · <span className="text-body2">{username}</span>
-          </span>
-        </div>
+      </li>
+    );
+  };
+  return (
+    <header className="relative px-6 pt-4 lg:px-10">
+      <nav aria-label="Main" className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-8 gap-y-1">
+        <ul className="flex gap-x-8">{LINKS.slice(0, 2).map(link)}</ul>
+        <Link href="/" aria-label="Nimzo home" className="mx-3 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo.svg" width={72} height={72} alt="" className="h-[72px] w-[72px]" />
+        </Link>
+        <ul className="flex gap-x-8">{LINKS.slice(2).map(link)}</ul>
+      </nav>
+      <div className="absolute right-6 top-5 hidden items-center gap-4 text-[0.8125rem] text-muted lg:right-10 xl:flex">
+        <AnalysisStatus />
+        <span>
+          chess.com · <span className="text-body2">{username}</span>
+        </span>
       </div>
+      <div className="mx-auto mt-3 h-[5px] max-w-[1600px] border-y border-[color:var(--gold-rule)]" aria-hidden="true" />
     </header>
   );
 }

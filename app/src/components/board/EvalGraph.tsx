@@ -7,7 +7,7 @@ export type GraphPoint = { ply: number; whitePct: number | null; severity?: Seve
 
 const W = 600;
 const H = 120;
-const MARKER_COLOR: Record<Severity, string> = { blunder: "#9E2B25", miss: "#E0584A", mistake: "#C9832E", inaccuracy: "#C9A063" };
+const MARKER_COLOR: Record<Severity, string> = { blunder: "#FA412D", miss: "#FF7769", mistake: "#FFA459", inaccuracy: "#F7C631" };
 
 /**
  * Win% across the game (White's perspective, 50% = level). Click anywhere to
@@ -60,11 +60,11 @@ export function EvalGraph({
         aria-label="Evaluation graph. Click to jump to a move."
         role="img"
       >
-        <path d={area} fill="#EADFCB" opacity="0.45" />
-        <path d={line} fill="none" stroke="#5C3D24" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-        <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="#DCCFB8" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <path d={area} fill="#E3C35A" opacity="0.14" />
+        <path d={line} fill="none" stroke="#E3C35A" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="#2C4C3C" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         {current > 0 && (
-          <line x1={x(current)} x2={x(current)} y1="0" y2={H} stroke="#C9A063" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          <line x1={x(current)} x2={x(current)} y1="0" y2={H} stroke="#EFE6CC" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
         )}
       </svg>
       {points
@@ -75,7 +75,7 @@ export function EvalGraph({
             type="button"
             onClick={() => onSelect(p.ply)}
             aria-label={`Jump to ${p.severity} at ply ${p.ply}`}
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FBF8F1] shadow-[0_0_0_1px_#DCCFB8]"
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#132e23] shadow-[0_0_0_1px_#2c4c3c]"
             style={{
               left: `${(x(p.ply) / W) * 100}%`,
               top: `${(y(p.whitePct!) / H) * 100}%`,
