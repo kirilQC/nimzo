@@ -1,7 +1,7 @@
 import "server-only";
 import type { CoachInfo, ReviewData, ReviewPly } from "@/components/review/GameReview";
 import { Chess } from "chess.js";
-import { pgnToPositions } from "@/lib/chess/pgn";
+import { initialClockMs, pgnToPositions } from "@/lib/chess/pgn";
 import { phaseOf } from "@/lib/analysis/features";
 import { formatLine } from "@/lib/chess/lines";
 import { formatScore, gameAccuracy, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
@@ -125,6 +125,7 @@ export function buildReviewData(args: {
       color: p.color,
       fenAfter: p.fenAfter,
       clockMs: p.clockMs,
+      spentMs: p.timeSpentMs,
       isMine: p.color === mine,
       severity: isSeverity(row?.classification) ? row.classification : null,
       label: isLabelId(row?.classification) ? row.classification : null,
@@ -185,6 +186,7 @@ export function buildReviewData(args: {
   const opp = analyzed ? gameAccuracy(oppAccs) : null;
 
   return {
+    startClockMs: initialClockMs(parsed.headers.TimeControl),
     gameId: args.gameId,
     counts: analyzed ? counts : null,
     accuracyOpponent: opp === null ? null : Math.round(opp * 10) / 10,

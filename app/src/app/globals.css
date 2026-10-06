@@ -381,6 +381,9 @@ a { color: inherit; }
 @keyframes badge-pop { 0% { transform: scale(0); } 60% { transform: scale(1.22); } 100% { transform: scale(1); } }
 .badge-pop { animation: badge-pop 360ms cubic-bezier(0.3, 1.4, 0.5, 1) both; transform-origin: center; }
 
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 .glide { transition: transform 260ms cubic-bezier(0.6, 0, 0.2, 1), width 260ms ease, height 260ms ease, opacity 160ms ease; }
 
 @media (prefers-reduced-motion: reduce) {

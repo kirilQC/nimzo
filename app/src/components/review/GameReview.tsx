@@ -25,6 +25,7 @@ export type ReviewPly = {
   color: "w" | "b";
   fenAfter: string;
   clockMs: number | null;
+  spentMs: number | null; // time the mover spent on this move
   isMine: boolean;
   severity: Severity | null;
   label: LabelId | null;
@@ -89,6 +90,7 @@ export type ReviewData = {
   players?: { me: string; opponent: string };
   initialPly?: number; // open at this move
   ending?: string | null; // how it ended, e.g. "Timeout"
+  startClockMs?: number | null; // each side's clock at the start
 };
 
 function moveLabel(p: { ply: number; color: "w" | "b"; san: string }, suffix = "") {
@@ -211,6 +213,27 @@ export function GameReview({ data }: { data: ReviewData }) {
 
   const selectedCoach = pos && pos.isMine && pos.severity ? coach[pos.ply] : undefined;
 
+  // Both clocks as they stood at this position: each side's time after its latest move.
+  const clocks = useMemo(() => {
+    let w = data.startClockMs ?? null, b = data.startClockMs ?? null;
+    for (const p of plies.slice(0, current)) {
+      if (p.clockMs === null) continue;
+      if (p.color === "w") w = p.clockMs;
+      else b = p.clockMs;
+    }
+    return { white: w, black: b, any: plies.some((p) => p.clockMs !== null) };
+  }, [plies, current, data.startClockMs]);
+  const toMove: "white" | "black" = (pos?.color ?? "b") === "w" ? "black" : "white";
+  const theirColor = myColor === "white" ? "black" : "white";
+  const strip = (side: "white" | "black", mine: boolean) => (
+    <ClockStrip
+      name={mine ? (data.players?.me ?? "You") : (data.players?.opponent ?? "Opponent")}
+      clockMs={clocks.any ? clocks[side] : null}
+      active={current < plies.length && toMove === side}
+      spentMs={pos && (pos.color === "w") === (side === "white") ? pos.spentMs : null}
+    />
+  );
+
   // The graph is in your terms: your winning chances, and the game split into its parts.
   const graphPoints = useMemo(
     () => plies.map((p) => ({ ply: p.ply, myPct: p.whitePct === null ? null : myColor === "white" ? p.whitePct : 100 - p.whitePct, label: p.label, isMine: p.isMine })),
@@ -232,6 +255,7 @@ export function GameReview({ data }: { data: ReviewData }) {
           aria-label="Game board. Use the arrow keys to step through the game."
           className="rounded-[8px]"
         >
+          <div className="mb-2 pl-[22px]">{strip(theirColor, false)}</div>
           <div className="flex gap-2">
             <EvalBar whitePct={whitePct} orientation={myColor} />
             <div className="relative min-w-0 flex-1">
@@ -248,6 +272,7 @@ export function GameReview({ data }: { data: ReviewData }) {
               )}
             </div>
           </div>
+          <div className="mt-2 pl-[22px]">{strip(myColor, true)}</div>
         </div>
 
         <div className="flex items-center justify-center gap-2">
@@ -267,7 +292,6 @@ export function GameReview({ data }: { data: ReviewData }) {
             Next mistake
           </button>
         </div>
-        <ArrowLegend next={next} canExplain={!!data.gameId} whyOpen={whyOpen} onWhy={showWhy} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <MoveList rows={moveRows} current={current} onSelect={go} listRef={listRef} />
@@ -359,7 +383,7 @@ function MoveList({ rows, current, onSelect, listRef }: { rows: MoveRow[]; curre
       <h2 id="moves-h" className="label-data mb-1.5">
         Moves
       </h2>
-      <ol ref={listRef} className="mono relative max-h-[360px] overflow-y-auto text-[0.9375rem]">
+      <ol ref={listRef} className="no-scrollbar mono relative max-h-[360px] overflow-y-auto text-[0.9375rem]">
         <li ref={glideRef} aria-hidden="true" className="glide pointer-events-none absolute left-0 top-0 rounded-[4px] bg-gold opacity-0" />
         {rows.map((row) => {
           const blunder = row.w?.isMine ? row.w.severity === "blunder" : row.b?.isMine ? row.b.severity === "blunder" : false;
@@ -577,49 +601,40 @@ function BestMoveHint({ uci, orientation, open, state, onHover }: { uci: string;
   );
 }
 
-function ArrowLegend({ next, canExplain, whyOpen, onWhy }: { next: ReviewPly | undefined; canExplain: boolean; whyOpen: boolean; onWhy: (open: boolean) => void }) {
-  if (!next) return null;
-  const matched = next.bestUci?.slice(0, 4) === `${next.from}${next.to}`;
-  const who = next.isMine ? "You" : "They";
-  const why = canExplain && next.bestUci && (
-    <button
-      type="button"
-      aria-expanded={whyOpen}
-      aria-describedby={whyOpen ? "why-best" : undefined}
-      onMouseEnter={() => onWhy(true)}
-      onMouseLeave={() => onWhy(false)}
-      onFocus={() => onWhy(true)}
-      onBlur={() => onWhy(false)}
-      onClick={() => onWhy(!whyOpen)}
-      className="font-bold text-good underline decoration-dotted underline-offset-4"
-    >
-      why?
-    </button>
-  );
+function clockText(ms: number): string {
+  if (ms < 20_000) return `0:${(ms / 1000).toFixed(1).padStart(4, "0")}`; // tenths when it's tight
+  return formatClock(ms);
+}
+
+function spentText(ms: number): string {
+  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+}
+
+/** A player's name with their clock at this position, chess.com style; the side to move is lit up. */
+function ClockStrip({ name, clockMs, active, spentMs }: { name: string; clockMs: number | null; active: boolean; spentMs: number | null }) {
+  const low = clockMs !== null && clockMs < 60_000;
   return (
-    <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[0.8125rem] text-body2" aria-live="polite">
-      {matched ? (
-        <span className="inline-flex items-center gap-2">
-          <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
-          {who} played the engine&apos;s best move next: <span className="mono text-ink">{next.san}</span>
-          {why}
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex min-w-0 items-baseline gap-2">
+        <span className="truncate font-semibold text-ink">{name}</span>
+        {spentMs !== null && spentMs >= 1000 && <span className="mono shrink-0 text-[0.8125rem] text-muted">took {spentText(spentMs)}</span>}
+      </span>
+      {clockMs !== null && (
+        <span
+          className={`mono flex min-w-[112px] items-center justify-end gap-2 rounded-[6px] px-3 py-1 text-[1.375rem] leading-none transition-colors ${
+            active ? (low ? "bg-[color:var(--loss)] text-[#2a0805]" : "bg-gold text-[color:var(--on-gold)]") : low ? "bg-chip text-[color:var(--loss)]" : "bg-chip text-ink"
+          }`}
+          aria-label={`${name}'s clock: ${formatClock(clockMs)}`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" className={active ? "opacity-90" : "opacity-50"}>
+            <circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" strokeWidth="2.4" />
+            <path d="M12 9v4.5l2.8 1.7M9.5 2.5h5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+          {clockText(clockMs)}
         </span>
-      ) : (
-        <>
-          <span className="inline-flex items-center gap-2">
-            <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: NEXT_ARROW }} aria-hidden="true" />
-            {who} played next: <span className="mono text-ink">{next.san}</span>
-          </span>
-          {next.bestUci && (
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
-              Engine&apos;s best move here
-              {why}
-            </span>
-          )}
-        </>
       )}
-    </p>
+    </div>
   );
 }
 

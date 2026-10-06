@@ -33,7 +33,7 @@ export function Nav({ username }: { username: string }) {
   };
   return (
     <header className="relative z-10 px-6 pt-4 lg:px-10">
-      <nav aria-label="Main" className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-8 gap-y-1">
+      <nav aria-label="Main" className="mx-auto flex max-w-[1760px] flex-wrap items-center justify-center gap-x-8 gap-y-1">
         <ul className="flex gap-x-8">{LINKS.slice(0, 2).map(link)}</ul>
         <Link href="/" aria-label="Nimzo home" className="mx-3 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -47,7 +47,7 @@ export function Nav({ username }: { username: string }) {
           chess.com · <span className="text-body2">{username}</span>
         </span>
       </div>
-      <div className="mx-auto mt-3 h-[5px] max-w-[1600px] border-y border-[color:var(--gold-rule)]" aria-hidden="true" />
+      <div className="mx-auto mt-3 h-[5px] max-w-[1760px] border-y border-[color:var(--gold-rule)]" aria-hidden="true" />
     </header>
   );
 }
