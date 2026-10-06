@@ -37,7 +37,7 @@ export function Nav({ username }: { username: string }) {
         <ul className="flex gap-x-8">{LINKS.slice(0, 2).map(link)}</ul>
         <Link href="/" aria-label="Nimzo home" className="mx-3 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo.svg" width={144} height={144} alt="" className="h-[144px] w-[144px]" />
+          <img src="/brand/logo.svg" width={108} height={108} alt="" className="h-[108px] w-[108px]" />
         </Link>
         <ul className="flex gap-x-8">{LINKS.slice(2).map(link)}</ul>
       </nav>
