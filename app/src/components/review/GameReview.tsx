@@ -143,6 +143,36 @@ export function GameReview({ data }: { data: ReviewData }) {
 
   const pos = current > 0 ? plies[current - 1] : undefined;
   const next = plies[current]; // the move actually played from this position
+
+  // "Why is the green arrow best?": fetched on first hover, cached per position.
+  const [whyPly, setWhyPly] = useState<number | null>(null);
+  const [whyCache, setWhyCache] = useState<Record<number, WhyState>>({});
+  const whyInFlight = useRef(new Set<number>());
+  const requestWhy = useCallback(
+    async (ply: number) => {
+      if (!data.gameId || whyInFlight.current.has(ply)) return;
+      whyInFlight.current.add(ply);
+      try {
+        const res = await fetch(`/api/games/${data.gameId}/why-best`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ply }) });
+        const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+        if (!res.ok || !json.text) throw new Error(json.error ?? "Arthur couldn't explain this one just now.");
+        setWhyCache((m) => ({ ...m, [ply]: { text: json.text } }));
+      } catch (e) {
+        setWhyCache((m) => ({ ...m, [ply]: { error: (e as Error).message } }));
+        whyInFlight.current.delete(ply); // allow a retry on the next hover
+      }
+    },
+    [data.gameId],
+  );
+  const showWhy = useCallback(
+    (open: boolean) => {
+      if (!open || !next?.bestUci) return setWhyPly(null);
+      setWhyPly(next.ply);
+      if (!whyCache[next.ply]) void requestWhy(next.ply);
+    },
+    [next, whyCache, requestWhy],
+  );
+  const whyOpen = !!next && whyPly === next.ply;
   const fen = pos?.fenAfter ?? startFen;
   const whitePct = pos ? pos.whitePct : null;
 
@@ -190,7 +220,7 @@ export function GameReview({ data }: { data: ReviewData }) {
         >
           <div className="flex gap-2">
             <EvalBar whitePct={whitePct} orientation={myColor} />
-            <div className="min-w-0 flex-1">
+            <div className="relative min-w-0 flex-1">
               <Board
                 fen={fen}
                 orientation={myColor}
@@ -199,6 +229,9 @@ export function GameReview({ data }: { data: ReviewData }) {
                 arrows={nextArrows(next)}
                 label={pos ? `Position after ${moveLabel(pos)}` : "Starting position"}
               />
+              {data.gameId && next?.bestUci && (
+                <BestMoveHint uci={next.bestUci} orientation={myColor} open={whyOpen} state={whyCache[next.ply]} onHover={showWhy} />
+              )}
             </div>
           </div>
         </div>
@@ -220,7 +253,7 @@ export function GameReview({ data }: { data: ReviewData }) {
             Next mistake
           </button>
         </div>
-        <ArrowLegend next={next} />
+        <ArrowLegend next={next} canExplain={!!data.gameId} whyOpen={whyOpen} onWhy={showWhy} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <MoveList rows={moveRows} current={current} onSelect={go} listRef={listRef} />
@@ -463,16 +496,83 @@ function nextArrows(next: ReviewPly | undefined) {
   return arrows;
 }
 
-function ArrowLegend({ next }: { next: ReviewPly | undefined }) {
+type WhyState = { text?: string; error?: string };
+
+/** Centre of a square in percent of the board, from the viewer's side. */
+function squareCenter(sq: string, orientation: "white" | "black") {
+  const file = sq.charCodeAt(0) - 97, rank = Number(sq[1]);
+  const col = orientation === "white" ? file : 7 - file;
+  const row = orientation === "white" ? 8 - rank : rank - 1;
+  return { x: (col + 0.5) * 12.5, y: (row + 0.5) * 12.5 };
+}
+
+/**
+ * Hovering the green arrow asks Arthur why it is the best move. An invisible, wide
+ * stroke along the arrow catches the pointer; the answer floats beside the arrow.
+ */
+function BestMoveHint({ uci, orientation, open, state, onHover }: { uci: string; orientation: "white" | "black"; open: boolean; state?: WhyState; onHover: (open: boolean) => void }) {
+  const a = squareCenter(uci.slice(0, 2), orientation), b = squareCenter(uci.slice(2, 4), orientation);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const above = mid.y > 45;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30">
+      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
+        <line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke="transparent"
+          strokeWidth="7"
+          strokeLinecap="round"
+          className="pointer-events-auto cursor-help"
+          onMouseEnter={() => onHover(true)}
+          onMouseLeave={() => onHover(false)}
+        />
+      </svg>
+      {open && (
+        <div
+          role="tooltip"
+          id="why-best"
+          className="absolute w-[min(320px,80%)] -translate-x-1/2 rounded-[12px] border border-[color:var(--good-line)] bg-[#0b1f17]/95 px-4 py-3 text-left shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+          style={{ left: `${Math.min(78, Math.max(22, mid.x))}%`, ...(above ? { bottom: `${100 - mid.y + 7}%` } : { top: `${mid.y + 7}%` }) }}
+        >
+          <p className="label-data mb-1 text-good">Why this is the best move</p>
+          <p className="text-[0.9375rem] leading-snug text-ink">
+            {state?.text ?? (state?.error ? <span className="text-muted">{state.error}</span> : <span className="text-muted">Arthur is looking at it…</span>)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArrowLegend({ next, canExplain, whyOpen, onWhy }: { next: ReviewPly | undefined; canExplain: boolean; whyOpen: boolean; onWhy: (open: boolean) => void }) {
   if (!next) return null;
   const matched = next.bestUci?.slice(0, 4) === `${next.from}${next.to}`;
   const who = next.isMine ? "You" : "They";
+  const why = canExplain && next.bestUci && (
+    <button
+      type="button"
+      aria-expanded={whyOpen}
+      aria-describedby={whyOpen ? "why-best" : undefined}
+      onMouseEnter={() => onWhy(true)}
+      onMouseLeave={() => onWhy(false)}
+      onFocus={() => onWhy(true)}
+      onBlur={() => onWhy(false)}
+      onClick={() => onWhy(!whyOpen)}
+      className="font-bold text-good underline decoration-dotted underline-offset-4"
+    >
+      why?
+    </button>
+  );
   return (
     <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[0.8125rem] text-body2" aria-live="polite">
       {matched ? (
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
           {who} played the engine&apos;s best move next: <span className="mono text-ink">{next.san}</span>
+          {why}
         </span>
       ) : (
         <>
@@ -484,6 +584,7 @@ function ArrowLegend({ next }: { next: ReviewPly | undefined }) {
             <span className="inline-flex items-center gap-2">
               <span className="inline-block h-1.5 w-6 rounded-full" style={{ background: BEST_ARROW }} aria-hidden="true" />
               Engine&apos;s best move here
+              {why}
             </span>
           )}
         </>

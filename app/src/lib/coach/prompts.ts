@@ -52,6 +52,15 @@ Write 2 or 3 short sentences:
 3. Optional: the habit from the knowledge base that prevents it next time.
 No notation, no square names, no dashes. Under 18 words per sentence.`;
 
+export const WHY_BEST_TASK = `Task: the player is hovering over the engine's best move arrow and wants to know exactly WHY that move is best.
+
+You get what the engine's move concretely does, computed from the board (what it takes, attacks, protects, saves, stops or sets up), whose move it is, and whether that move was actually played.
+
+Write 1 or 2 short sentences:
+1. Lead with the main reason, naming the piece: "Your knight jumps in to attack their queen and rook at once."
+2. Optional: what it sets up or prevents next, if the facts say so.
+Use only the facts given. If the facts show nothing tactical, explain the quiet improvement they describe (developing, castling, the center). No notation, no square names, no dashes, no numbers of points. Under 18 words per sentence.`;
+
 export const COACH_NOTE_TASK = `Task: write the coach's note for the home page: ONE sentence (max 25 words) about the player's biggest recurring habit, based only on the pattern statistics given (motif, how many of the recent games it appeared in). Make it concrete and actionable, in the coach voice. No moves, no numbers other than game counts, no dashes.`;
 
 export const SESSION_SUMMARY_TASK = `Task: summarize one playing session (several games played back to back).
