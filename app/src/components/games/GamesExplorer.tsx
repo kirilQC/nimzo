@@ -185,7 +185,7 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
             </thead>
             <tbody>
               {stats.openings.slice(0, 10).map((o) => (
-                <tr key={o.name} className="cursor-pointer" onClick={() => resetPage(setQ)(o.name)} title="Show these games">
+                <tr key={o.name} className="row-lift cursor-pointer" onClick={() => resetPage(setQ)(o.name)} title="Show these games">
                   <td className="max-w-[240px] truncate text-walnut">{o.name}</td>
                   <td className="mono text-right text-ink">{o.games}</td>
                   <td className="mono text-right text-ink">{pct(o.wins, o.games)}</td>
@@ -249,7 +249,7 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
           </thead>
           <tbody>
             {shown.map((g) => (
-              <tr key={g.id}>
+              <tr key={g.id} className="row-lift">
                 <td className="whitespace-nowrap text-body2" suppressHydrationWarning>
                   <span className="mono">{fmtDate(g.end)}</span>
                   <span className="block text-xs text-muted" title={g.timeControl ?? undefined}>

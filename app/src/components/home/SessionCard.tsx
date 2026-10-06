@@ -262,6 +262,7 @@ export function SessionCard({
         )}
       </h1>
       <p className="mt-4 max-w-[560px] text-[0.9375rem] text-body2" role="status">
+        {on && <span className="pulse-dot mr-2 inline-block h-2 w-2 rounded-full bg-good align-middle" aria-hidden="true" />}
         {statusLine}
         {on && syncing && <span className="text-muted"> · syncing…</span>}
       </p>
@@ -275,7 +276,7 @@ export function SessionCard({
         onClick={() => (session ? end(session.id, "manual", false) : turnOn())}
         className={`mt-8 min-h-[76px] rounded-full px-14 text-[1.375rem] font-extrabold transition-colors disabled:cursor-progress disabled:opacity-60 ${
           on
-            ? "border border-gold bg-transparent text-gold shadow-[0_0_0_10px_rgba(227,195,90,0.08)] hover:bg-[rgba(227,195,90,0.08)]"
+            ? "breathe border border-gold bg-transparent text-gold shadow-[0_0_0_10px_rgba(227,195,90,0.08)] hover:bg-[rgba(227,195,90,0.08)]"
             : "bg-gold text-[color:var(--on-gold)] shadow-[0_0_0_10px_rgba(227,195,90,0.12),0_20px_50px_rgba(0,0,0,0.4)] hover:bg-[color:var(--walnut-hover)]"
         }`}
       >
@@ -323,7 +324,7 @@ export function SessionCard({
                 if (g.blunders) flags.push({ severity: "blunder", count: g.blunders });
                 if (g.mistakes) flags.push({ severity: "mistake", count: g.mistakes });
                 return (
-                  <li key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 text-sm">
+                  <li key={g.id} className="row-lift flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-2 py-2.5 text-sm">
                     <span className="font-semibold text-ink">vs {g.opponent}</span>
                     <span className={g.result === "win" ? "font-bold text-good" : g.result === "loss" ? "font-bold text-[color:var(--loss)]" : "text-body2"}>{RESULT[g.result]}</span>
                     <span className="text-muted">{tcLabel(g.time_control)}</span>

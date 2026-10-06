@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Avatar, Flag, type PlayerLook } from "@/components/PlayerBadge";
 import { ReanalyzeButton } from "./ReanalyzeButton";
+import { CountUp } from "@/components/motion";
 
 export type Readouts = {
   gameId: string | null;
@@ -23,7 +24,7 @@ function countryName(code: string | null | undefined): string | null {
 
 function Tile({ label, children, className = "" }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`panel-data min-w-0 px-4 py-3 ${className}`}>
+    <div className={`panel-data lift min-w-0 px-4 py-3 ${className}`}>
       {label && <p className="label-data">{label}</p>}
       {children}
     </div>
@@ -70,15 +71,17 @@ export function GameReadouts({ r }: { r: Readouts }) {
         <p className="text-[0.8125rem] text-muted">{r.game.sub}</p>
       </Tile>
       <Tile className="flex items-center gap-3">
-        <svg width="58" height="58" viewBox="0 0 60 60" role="img" aria-label={r.accuracy.mine !== null ? `Your accuracy ${r.accuracy.mine.toFixed(1)}` : "Accuracy not ready"} className="shrink-0">
+        <span className="relative shrink-0">
+        <svg width="58" height="58" viewBox="0 0 60 60" aria-hidden="true">
           <circle cx="30" cy="30" r="24" fill="none" stroke="var(--border)" strokeWidth="6" />
           {r.accuracy.mine !== null && (
-            <circle cx="30" cy="30" r="24" fill="none" stroke="var(--brass)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(pct / 100) * circ} ${circ}`} transform="rotate(-90 30 30)" />
+            <circle className="ring-in" cx="30" cy="30" r="24" fill="none" stroke="var(--brass)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(pct / 100) * circ} ${circ}`} transform="rotate(-90 30 30)" />
           )}
-          <text x="30" y="35" textAnchor="middle" className="mono" fontSize="15" fontWeight="700" fill="var(--ink)">
-            {r.accuracy.mine !== null ? r.accuracy.mine.toFixed(1) : "?"}
-          </text>
         </svg>
+        <span className="mono absolute inset-0 flex items-center justify-center text-[0.9375rem] font-bold text-ink">
+          {r.accuracy.mine !== null ? <CountUp to={r.accuracy.mine} decimals={1} /> : "?"}
+        </span>
+        </span>
         <div>
           <p className="label-data">Accuracy</p>
           {r.accuracy.theirs !== null && <p className="text-[0.8125rem] text-muted">them {r.accuracy.theirs.toFixed(1)}</p>}

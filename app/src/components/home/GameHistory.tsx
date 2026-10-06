@@ -142,7 +142,7 @@ export function GameHistory({
             const [white, black] = g.my_color === "white" ? [mine, theirs] : [theirs, mine];
             const date = new Date(g.end_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
             return (
-              <tr key={g.id} className="relative border-t border-line transition-colors hover:bg-card2">
+              <tr key={g.id} className="row-lift relative border-t border-line">
                 <td className="py-3 text-center">
                   <span className="flex flex-col items-center gap-0.5">
                     <TimeIcon timeClass={g.time_class} />

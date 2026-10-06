@@ -32,7 +32,7 @@ export function Nav({ username }: { username: string }) {
     );
   };
   return (
-    <header className="relative px-6 pt-4 lg:px-10">
+    <header className="relative z-10 px-6 pt-4 lg:px-10">
       <nav aria-label="Main" className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-8 gap-y-1">
         <ul className="flex gap-x-8">{LINKS.slice(0, 2).map(link)}</ul>
         <Link href="/" aria-label="Nimzo home" className="mx-3 shrink-0">

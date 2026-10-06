@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAnalysis } from "@/components/analysis/AnalysisProvider";
 import { Board } from "@/components/board/Board";
 import { EvalBar } from "@/components/board/EvalBar";
@@ -13,6 +13,7 @@ import { formatClock } from "@/lib/chess/pgn";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { ArthurPanel } from "@/components/coach/ArthurPanel";
 import { GameSummary } from "./GameSummary";
+import { CountUp, Shimmer } from "@/components/motion";
 import { expressionForGame, expressionForMove } from "@/lib/coach/expressions";
 
 export type ReviewPly = {
@@ -329,12 +330,28 @@ type MoveRow = { no: number; w?: ReviewPly; b?: ReviewPly };
 
 /** The score sheet: one row per full move, the label icon beside each move, scrolling inside its own panel. */
 function MoveList({ rows, current, onSelect, listRef }: { rows: MoveRow[]; current: number; onSelect: (ply: number) => void; listRef: React.RefObject<HTMLOListElement | null> }) {
+  // One gold highlight that glides to the selected move instead of jumping.
+  const glideRef = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => {
+    const glide = glideRef.current;
+    const btn = listRef.current?.querySelector<HTMLElement>(`[data-ply="${current}"]`);
+    if (!glide) return;
+    if (!btn) {
+      glide.style.opacity = "0";
+      return;
+    }
+    glide.style.opacity = "1";
+    glide.style.transform = `translate(${btn.offsetLeft}px, ${btn.offsetTop}px)`;
+    glide.style.width = `${btn.offsetWidth}px`;
+    glide.style.height = `${btn.offsetHeight}px`;
+  }, [current, rows, listRef]);
   return (
     <section className="panel-data min-w-0" aria-labelledby="moves-h">
       <h2 id="moves-h" className="label-data mb-1.5">
         Moves
       </h2>
-      <ol ref={listRef} className="mono max-h-[360px] overflow-y-auto text-[0.9375rem]">
+      <ol ref={listRef} className="mono relative max-h-[360px] overflow-y-auto text-[0.9375rem]">
+        <li ref={glideRef} aria-hidden="true" className="glide pointer-events-none absolute left-0 top-0 rounded-[4px] bg-gold opacity-0" />
         {rows.map((row) => {
           const blunder = row.w?.isMine ? row.w.severity === "blunder" : row.b?.isMine ? row.b.severity === "blunder" : false;
           return (
@@ -359,7 +376,7 @@ function MoveCell({ p, current, onSelect }: { p?: ReviewPly; current: number; on
       data-ply={p.ply}
       onClick={() => onSelect(p.ply)}
       aria-current={active ? "step" : undefined}
-      className={`inline-flex min-h-[30px] items-center justify-self-start rounded-[4px] px-1.5 text-left ${active ? "bg-gold text-[color:var(--on-gold)]" : "text-ink hover:bg-chip"}`}
+      className={`relative z-10 inline-flex min-h-[30px] items-center justify-self-start rounded-[4px] px-1.5 text-left transition-colors ${active ? "text-[color:var(--on-gold)]" : "text-ink hover:bg-chip"}`}
     >
       <span className="inline-flex items-center gap-1.5">
         {p.label && p.label !== "good" && p.label !== "excellent" ? <MoveIcon label={p.label} size={20} /> : <span className="inline-block h-5 w-5" aria-hidden="true" />}
@@ -394,8 +411,12 @@ function MoveCounts({ counts }: { counts: ReviewData["counts"] }) {
                     {l.name}
                   </span>
                 </th>
-                <td className="w-8 text-right text-gold">{counts.me[l.id]}</td>
-                <td className="w-8 text-right text-muted">{counts.opponent[l.id]}</td>
+                <td className="w-8 text-right text-gold">
+                  <CountUp to={counts.me[l.id]} />
+                </td>
+                <td className="w-8 text-right text-muted">
+                  <CountUp to={counts.opponent[l.id]} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -539,7 +560,7 @@ function BestMoveHint({ uci, orientation, open, state, onHover }: { uci: string;
         >
           <p className="label-data mb-1 text-good">Why this is the best move</p>
           <p className="text-[0.9375rem] leading-snug text-ink">
-            {state?.text ?? (state?.error ? <span className="text-muted">{state.error}</span> : <span className="text-muted">Arthur is looking at it…</span>)}
+            {state?.text ?? (state?.error ? <span className="text-muted">{state.error}</span> : <Shimmer lines={2} label="Arthur is looking at it" />)}
           </p>
         </div>
       )}

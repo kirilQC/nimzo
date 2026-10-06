@@ -55,7 +55,7 @@ export function EvalGraph({
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="block h-[120px] w-full cursor-pointer"
+        className="draw-in block h-[120px] w-full cursor-pointer"
         onClick={handleClick}
         aria-label="Evaluation graph. Click to jump to a move."
         role="img"

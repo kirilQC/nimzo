@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { COACH } from "@/lib/coach/persona";
 import { EXPRESSIONS, expressionSrc, type Expression } from "@/lib/coach/expressions";
 import { MoveText } from "@/components/review/MoveText";
+import { Shimmer } from "@/components/motion";
 
 export type MoveTag = { id: string; label: string; polarity: "good" | "bad" };
 export type ArthurSay = { text: string; expression: Expression; ply?: number; tags?: MoveTag[] };
@@ -184,11 +185,15 @@ export function ArthurPanel({
             <h2 id="arthur-h" className="text-xl">
               {COACH.name}
             </h2>
-            {asking && <span className="text-sm text-muted">thinking…</span>}
           </div>
           <p className="mt-2 text-[1.1875rem] font-semibold leading-relaxed text-ink" aria-live="polite">
-            {bubble ? <MoveText text={bubble} onJump={onJump} /> : placeholder}
+            {bubble ? <MoveText key={bubble} text={bubble} onJump={onJump} animate /> : placeholder}
           </p>
+          {asking && (
+            <div className="mt-2">
+              <Shimmer lines={2} />
+            </div>
+          )}
           {moveTags.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="What happened on this move. Click a tag for Arthur's explanation.">
               {(allTags ? moveTags : moveTags.slice(0, 6)).map((t) => {
@@ -228,7 +233,7 @@ export function ArthurPanel({
           {openTag && moveTags.some((t) => openTag === `${focus!.ply}:${t.id}`) && (
             <div className="mt-3 rounded-[8px] bg-parchment px-3 py-2.5 text-sm leading-relaxed text-ink" aria-live="polite">
               {explaining === openTag ? (
-                <span className="text-muted">Arthur is thinking about why…</span>
+                <Shimmer lines={2} label="Arthur is thinking about why" />
               ) : openExplanation ? (
                 <>
                   <p>

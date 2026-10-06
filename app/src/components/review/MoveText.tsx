@@ -9,13 +9,25 @@ import { Fragment } from "react";
  */
 const REF = /\b(moves?)\s+(\d{1,3})((?:\s*(?:,|and|to|&|or)\s*\d{1,3})*)/gi;
 
-export function MoveText({ text, onJump }: { text: string; onJump?: (moveNumber: number) => void }) {
-  if (!onJump) return <>{text}</>;
+export function MoveText({ text, onJump, animate = false }: { text: string; onJump?: (moveNumber: number) => void; animate?: boolean }) {
+  // `animate`: words arrive one by one, as if Arthur is saying them.
+  let word = 0;
+  const words = (chunk: string, key: string | number): React.ReactNode =>
+    animate
+      ? chunk.split(/(s+)/).map((w, i) =>
+          /^s*$/.test(w) ? w : (
+            <span key={`${key}-${i}`} className="word-in" style={{ animationDelay: `${Math.min(word++, 40) * 45}ms` }}>
+              {w}
+            </span>
+          ),
+        )
+      : chunk;
+  if (!onJump) return <>{words(text, "t")}</>;
   const out: React.ReactNode[] = [];
   let last = 0;
   for (const m of text.matchAll(REF)) {
     const start = m.index!;
-    out.push(text.slice(last, start));
+    out.push(<Fragment key={`p${start}`}>{words(text.slice(last, start), `p${start}`)}</Fragment>);
     // "Move 5" / "moves 12 and 13": keep the words, link each number.
     const chunk = m[0];
     const parts = chunk.split(/(\d{1,3})/);
@@ -27,19 +39,20 @@ export function MoveText({ text, onJump }: { text: string; onJump?: (moveNumber:
               key={i}
               type="button"
               onClick={() => onJump(Number(p))}
-              className="font-semibold text-walnut underline decoration-dotted underline-offset-2 hover:decoration-solid"
+              className={`font-semibold text-walnut underline decoration-dotted underline-offset-2 hover:decoration-solid ${animate ? "word-in" : ""}`}
+              style={animate ? { animationDelay: `${Math.min(word++, 40) * 45}ms` } : undefined}
               title={`Show move ${p} on the board`}
             >
               {p}
             </button>
           ) : (
-            <Fragment key={i}>{p}</Fragment>
+            <Fragment key={i}>{words(p, `${start}-${i}`)}</Fragment>
           ),
         )}
       </Fragment>,
     );
     last = start + chunk.length;
   }
-  out.push(text.slice(last));
+  out.push(<Fragment key="end">{words(text.slice(last), "end")}</Fragment>);
   return <>{out}</>;
 }
