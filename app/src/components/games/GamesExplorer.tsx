@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { RatingChart, type RatingSeries } from "./RatingChart";
+import { RatingJourney } from "./RatingJourney";
 import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
 
 export type ExplorerGame = {
@@ -32,7 +32,6 @@ export type ExplorerGame = {
 type SortKey = "end" | "opponent" | "oppRating" | "myRating" | "result" | "moves" | "accuracy" | "opening";
 const PAGE = 50;
 const CLASS_ORDER = ["bullet", "blitz", "rapid", "daily", "other"];
-const CLASS_COLOR: Record<string, string> = { bullet: "#FF7769", blitz: "#FFA459", rapid: "#8FD3A8", daily: "#7FB5E6", other: "#A39A7C" };
 const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
 const RESULT_RANK = { win: 2, draw: 1, loss: 0 } as const;
 
@@ -102,21 +101,6 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
   };
 
   const stats = useMemo(() => summarize(filtered), [filtered]);
-  const series = useMemo<RatingSeries[]>(() => {
-    const pick = timeClass === "all" ? classes.map((c) => c.id) : [timeClass];
-    return pick
-      .map((c) => ({
-        id: c,
-        label: cap(c),
-        color: CLASS_COLOR[c] ?? CLASS_COLOR.other!,
-        points: games
-          .filter((g) => g.timeClass === c && g.myRating !== null)
-          .map((g) => ({ t: Date.parse(g.end), rating: g.myRating! }))
-          .sort((a, b) => a.t - b.t),
-      }))
-      .filter((s) => s.points.length > 1);
-  }, [games, classes, timeClass]);
-
   function sortBy(key: SortKey) {
     setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "end" || key === "accuracy" || key === "myRating" || key === "oppRating" ? -1 : 1 }));
     setPage(0);
@@ -151,22 +135,8 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
         <Tile label="Most played opening" value={<span className="text-lg">{stats.openings[0]?.name ?? "–"}</span>} hint={stats.openings[0] ? `${stats.openings[0].games} games · ${pct(stats.openings[0].wins, stats.openings[0].games)}% won` : undefined} />
       </div>
 
-      {/* Rating journey */}
-      <section className="card" aria-labelledby="rating-h">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="rating-h">Rating journey</h2>
-          <ul className="flex flex-wrap gap-3 text-sm text-body2">
-            {series.map((s) => (
-              <li key={s.id} className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden="true" />
-                {s.label}: <span className="mono text-ink">{s.points.at(-1)!.rating}</span>
-                <span className="text-muted">(started {s.points[0]!.rating})</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {series.length ? <RatingChart series={series} /> : <p className="text-sm text-muted">Not enough rated games to draw a line.</p>}
-      </section>
+      {/* Rating: one time control at a time */}
+      <RatingJourney games={games} initial={timeClass === "all" ? undefined : timeClass} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Openings */}
