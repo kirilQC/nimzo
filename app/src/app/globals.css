@@ -7,6 +7,7 @@
 :root {
   --parchment: #0d241b; /* page */
   --card: #132e23;
+  --card-2: #173629;
   --border: #24402f;
   --border-soft: #1d3a2c;
   --chip: #1b3a2d;
@@ -60,6 +61,7 @@
 @theme inline {
   --color-parchment: var(--parchment);
   --color-card: var(--card);
+  --color-card2: var(--card-2);
   --color-line: var(--border);
   --color-line-soft: var(--border-soft);
   --color-chip: var(--chip);
@@ -75,6 +77,8 @@
   --font-sans: var(--font-manrope), system-ui, sans-serif;
   --font-mono: var(--font-barlow-c), ui-monospace, monospace; /* numbers and moves: cockpit condensed */
   --font-nav: var(--font-mulish), system-ui, sans-serif;
+  --font-display: var(--font-instrument), Georgia, serif;
+  --font-poster: var(--font-anton), Impact, sans-serif;
   --color-gold: var(--brass);
   --color-good: var(--good);
 }

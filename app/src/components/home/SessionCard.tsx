@@ -240,55 +240,68 @@ export function SessionCard({
   }
 
   const endTarget = session ?? leftOpen;
+  const kicker = on ? "Session mode is on" : busy === "backfill" ? "Importing your games" : "Session mode is off";
   const statusLine = on
-    ? "On · checking chess.com every 60 seconds for finished games"
+    ? `Checking chess.com every 60 seconds for finished games${session ? ` · since ${new Date(session.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`
     : busy === "backfill"
       ? `Importing your last ${backfillMonths} months from chess.com…`
-      : "Off · nothing is running.";
+      : "Turn it on before you play. Every finished game gets analyzed the moment it ends.";
 
   return (
-    <section className="card p-6" aria-labelledby={labelId}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 id={labelId} className="text-[1.75rem] leading-tight">
-            Session mode
-          </h2>
-          <p className="mt-1 text-[0.9375rem] text-body2" role="status">
-            {statusLine}
-            {on && syncing && <span className="text-muted"> · syncing…</span>}
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-labelledby={labelId}
-          className="toggle"
-          disabled={busy === "starting" || busy === "ending"}
-          onClick={() => (session ? end(session.id, "manual", false) : turnOn())}
-        />
-      </div>
+    <section className="flex flex-col items-center px-4 pb-4 pt-10 text-center" aria-labelledby={labelId}>
+      <p className="label-data tracking-[0.3em]">{kicker}</p>
+      <h1 id={labelId} className="mt-3 font-[family-name:var(--font-display)] text-[clamp(3.5rem,8vw,7rem)] font-normal leading-none tracking-normal">
+        {on ? (
+          <>
+            Go <em className="text-gold">play.</em>
+          </>
+        ) : (
+          <>
+            Shall we <em className="text-gold">play?</em>
+          </>
+        )}
+      </h1>
+      <p className="mt-4 max-w-[560px] text-[0.9375rem] text-body2" role="status">
+        {statusLine}
+        {on && syncing && <span className="text-muted"> · syncing…</span>}
+      </p>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button type="button" className="btn btn-primary" onClick={analyzeLast} disabled={busy !== null}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Session mode"
+        disabled={busy === "starting" || busy === "ending" || busy === "backfill"}
+        onClick={() => (session ? end(session.id, "manual", false) : turnOn())}
+        className={`mt-8 min-h-[76px] rounded-full px-14 text-[1.375rem] font-extrabold transition-colors disabled:cursor-progress disabled:opacity-60 ${
+          on
+            ? "border border-gold bg-transparent text-gold shadow-[0_0_0_10px_rgba(227,195,90,0.08)] hover:bg-[rgba(227,195,90,0.08)]"
+            : "bg-gold text-[color:var(--on-gold)] shadow-[0_0_0_10px_rgba(227,195,90,0.12),0_20px_50px_rgba(0,0,0,0.4)] hover:bg-[color:var(--walnut-hover)]"
+        }`}
+      >
+        {busy === "starting" ? "Starting…" : busy === "ending" ? "Stopping…" : on ? "Turn session off" : "Start a session"}
+      </button>
+
+      <p className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[0.9375rem]">
+        <button type="button" className="font-bold text-gold underline underline-offset-4 disabled:opacity-50" onClick={analyzeLast} disabled={busy !== null}>
           {busy === "analyzing" ? "Syncing…" : "Analyze my last game"}
         </button>
         <button
           type="button"
-          className="btn btn-secondary"
+          className="text-muted underline-offset-4 enabled:text-body2 enabled:hover:underline disabled:cursor-not-allowed"
           disabled={!endTarget || busy !== null}
           onClick={() => endTarget && end(endTarget.id, endTarget === leftOpen ? "tab_closed" : "manual", true)}
         >
           End session &amp; summarize
         </button>
-      </div>
+      </p>
 
       {engine === "waking" && <p className="mt-3 text-sm text-muted">Loading the engines…</p>}
       {engine === "error" && <p className="mt-3 text-sm text-muted">Maia didn&apos;t load. It will retry when a game needs it.</p>}
       {leftOpen && !on && (
-        <p className="mt-3 text-sm text-body2">
+        <p className="mt-3 max-w-[560px] text-sm text-body2">
           A session from {new Date(leftOpen.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} was left open.
-          End it to see its summary, or turn Session mode on to start a new one.
+          End it to see its summary, or start a new one.
         </p>
       )}
       {message && <p className="mt-3 text-sm text-body2">{message}</p>}
@@ -299,26 +312,26 @@ export function SessionCard({
       )}
 
       {on && (
-        <div className="mt-5 border-t border-line-soft pt-4">
-          <p className="eyebrow mb-2">This session</p>
+        <div className="mt-8 w-full max-w-[680px] text-left">
+          <p className="label-data mb-1 text-center text-gold">This session</p>
           {games.length === 0 ? (
-            <p className="text-sm text-muted">Waiting for your first finished game…</p>
+            <p className="text-center text-sm text-muted">Waiting for your first finished game…</p>
           ) : (
-            <ul className="space-y-2">
+            <ul>
               {games.map((g) => {
                 const flags: { severity: Severity; count: number }[] = [];
                 if (g.blunders) flags.push({ severity: "blunder", count: g.blunders });
                 if (g.mistakes) flags.push({ severity: "mistake", count: g.mistakes });
                 return (
-                  <li key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <span className="text-ink">
-                      vs {g.opponent} · {RESULT[g.result]} · {tcLabel(g.time_control)}
-                    </span>
+                  <li key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 text-sm">
+                    <span className="font-semibold text-ink">vs {g.opponent}</span>
+                    <span className={g.result === "win" ? "font-bold text-good" : g.result === "loss" ? "font-bold text-[color:var(--loss)]" : "text-body2"}>{RESULT[g.result]}</span>
+                    <span className="text-muted">{tcLabel(g.time_control)}</span>
                     {flags.map((f) => (
                       <SeverityChip key={f.severity} severity={f.severity} count={f.count} />
                     ))}
-                    <span className="text-muted">{statusLabel(g, analysis.jobs[g.id])}</span>
-                    <Link href={`/games/${g.id}`} className="arrow-link">
+                    <span className="ml-auto text-muted">{statusLabel(g, analysis.jobs[g.id])}</span>
+                    <Link href={`/games/${g.id}`} className="font-bold text-gold">
                       Review
                     </Link>
                   </li>
