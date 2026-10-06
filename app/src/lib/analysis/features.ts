@@ -87,7 +87,7 @@ function stateOf(w: number): MoveFeatures["state_before"] {
   return w >= 75 ? "winning" : w >= 58 ? "better" : w > 42 ? "equal" : w > 25 ? "worse" : "losing";
 }
 
-function phaseOf(c: Chess, moveNumber: number): MoveFeatures["phase"] {
+export function phaseOf(c: Chess, moveNumber: number): MoveFeatures["phase"] {
   const np = nonPawnMaterial(c);
   const queens = c.board().flat().filter((p) => p?.type === "q").length;
   if (np <= 26 || (queens === 0 && np <= 32)) return "endgame";

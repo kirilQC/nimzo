@@ -100,6 +100,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/gam
     };
     const color = game.my_color === "white" ? "White" : "Black";
     const ending = describeEnding(game.result as "win" | "loss" | "draw", game.result_detail);
+    data.ending = ending.short;
     const moves = game.move_count ?? Math.ceil(data.plies.length / 2);
     header = {
       title: `You (${color}${game.my_rating ? `, ${game.my_rating}` : ""}) vs ${game.opponent}${game.opponent_rating ? ` (${game.opponent_rating})` : ""}`,

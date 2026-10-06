@@ -6,6 +6,7 @@ import { useAnalysis } from "@/components/analysis/AnalysisProvider";
 import { Board } from "@/components/board/Board";
 import { EvalBar } from "@/components/board/EvalBar";
 import { EvalGraph } from "@/components/board/EvalGraph";
+import { phaseSegments } from "@/lib/analysis/phases";
 import { SeverityChip, type Severity } from "@/components/ui";
 import { MoveIcon } from "@/components/board/MoveIcon";
 import { MOVE_LABELS, type LabelId } from "@/lib/analysis/labels";
@@ -30,6 +31,7 @@ export type ReviewPly = {
   note: string | null; // Arthur's one plain sentence about this move
   tags: { id: string; label: string; polarity: "good" | "bad" }[]; // what happened on this move (rule + Jev)
   bestUci: string | null; // engine's move in the position before this one
+  phase: "opening" | "middlegame" | "endgame";
   whitePct: number | null;
 };
 
@@ -86,6 +88,7 @@ export type ReviewData = {
   counts: { me: Record<LabelId, number>; opponent: Record<LabelId, number> } | null;
   players?: { me: string; opponent: string };
   initialPly?: number; // open at this move
+  ending?: string | null; // how it ended, e.g. "Timeout"
 };
 
 function moveLabel(p: { ply: number; color: "w" | "b"; san: string }, suffix = "") {
@@ -208,6 +211,16 @@ export function GameReview({ data }: { data: ReviewData }) {
 
   const selectedCoach = pos && pos.isMine && pos.severity ? coach[pos.ply] : undefined;
 
+  // The graph is in your terms: your winning chances, and the game split into its parts.
+  const graphPoints = useMemo(
+    () => plies.map((p) => ({ ply: p.ply, myPct: p.whitePct === null ? null : myColor === "white" ? p.whitePct : 100 - p.whitePct, label: p.label, isMine: p.isMine })),
+    [plies, myColor],
+  );
+  const segments = useMemo(
+    () => phaseSegments(graphPoints.map((p, i) => ({ ...p, phase: plies[i]!.phase })), { result: data.result, ending: data.ending ?? null }),
+    [graphPoints, plies, data.result, data.ending],
+  );
+
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
       {/* Board card: the board, the controls, then the score sheet and counts underneath */}
@@ -310,18 +323,14 @@ export function GameReview({ data }: { data: ReviewData }) {
 
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
-        <section className="card" aria-labelledby="eval-h">
-          <h2 id="eval-h" className="mb-3 text-[0.9375rem]">
-            How the game went
-          </h2>
-          <EvalGraph
-            points={plies.map((p) => ({ ply: p.ply, whitePct: p.whitePct, severity: p.severity, isMine: p.isMine }))}
-            current={current}
-            onSelect={go}
-          />
-        </section>
-
       </div>
+
+      <section className="card min-w-0 lg:col-span-2" aria-labelledby="eval-h">
+        <h2 id="eval-h" className="mb-3 text-[1.0625rem]">
+          How the game went
+        </h2>
+        <EvalGraph points={graphPoints} segments={segments} current={current} onSelect={go} />
+      </section>
     </div>
   );
 }

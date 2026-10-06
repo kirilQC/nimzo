@@ -1,6 +1,8 @@
 import "server-only";
 import type { CoachInfo, ReviewData, ReviewPly } from "@/components/review/GameReview";
+import { Chess } from "chess.js";
 import { pgnToPositions } from "@/lib/chess/pgn";
+import { phaseOf } from "@/lib/analysis/features";
 import { formatLine } from "@/lib/chess/lines";
 import { formatScore, gameAccuracy, isSeverity, mateFor, type Score } from "@/lib/analysis/math";
 import { MOVE_LABELS, isLabelId, type LabelId } from "@/lib/analysis/labels";
@@ -133,6 +135,7 @@ export function buildReviewData(args: {
         .sort((a, b) => tagRank(a) - tagRank(b))
         .map((t) => ({ id: t.id, label: t.label, polarity: t.polarity as "good" | "bad" })),
       bestUci: row?.best_move_uci ?? null,
+      phase: phaseOf(new Chess(p.fenAfter), Math.ceil(p.ply / 2)),
       whitePct: row?.win_pct !== null && row?.win_pct !== undefined ? Number(row.win_pct) : null,
     };
   });
