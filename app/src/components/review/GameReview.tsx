@@ -114,7 +114,7 @@ export function GameReview({ data }: { data: ReviewData }) {
     enqueue([data.gameId], { front: true });
   }, [data.gameId, data.status, enqueue]);
 
-  const go = useCallback(
+  const jump = useCallback(
     (ply: number) => {
       const next = Math.max(0, Math.min(plies.length, ply));
       setCurrent(next);
@@ -130,6 +130,42 @@ export function GameReview({ data }: { data: ReviewData }) {
     },
     [plies.length],
   );
+
+  // Playback: the game replays move by move, waiting as long as each move really took (or faster).
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<number>(1); // 1, 2, 5, 10 = times faster than real; 0 = one move a second
+  const [waited, setWaited] = useState(0); // ms since the current move appeared, while playing
+  /** Any navigation by you stops the replay. */
+  const go = useCallback(
+    (ply: number) => {
+      setPlaying(false);
+      jump(ply);
+    },
+    [jump],
+  );
+  const waitFor = useCallback((ms: number | null) => (speed === 0 ? 1000 : Math.max(250, (ms ?? 1000) / speed)), [speed]);
+  useEffect(() => {
+    const upcoming = plies[current];
+    if (!playing || !upcoming) return;
+    const wait = waitFor(upcoming.spentMs);
+    const started = performance.now();
+    const ticker = setInterval(() => setWaited(performance.now() - started), 100);
+    const timer = setTimeout(() => {
+      setWaited(0);
+      jump(current + 1);
+      if (current + 1 >= plies.length) setPlaying(false);
+    }, wait);
+    return () => {
+      clearInterval(ticker);
+      clearTimeout(timer);
+    };
+  }, [playing, current, plies, jump, waitFor]);
+  const togglePlay = () => {
+    if (playing) return setPlaying(false);
+    setWaited(0);
+    if (current >= plies.length) jump(0);
+    setPlaying(true);
+  };
 
   /** "Move 18" in Arthur's text means your 18th move: show it on the board and bring the board into view. */
   const jumpToMove = useCallback(
@@ -191,6 +227,7 @@ export function GameReview({ data }: { data: ReviewData }) {
       ArrowDown: () => go(plies.length),
       Home: () => go(0),
       End: () => go(plies.length),
+      " ": togglePlay,
     };
     const fn = keys[e.key];
     if (fn) {
@@ -226,10 +263,13 @@ export function GameReview({ data }: { data: ReviewData }) {
   }, [plies, current, data.startClockMs]);
   const toMove: "white" | "black" = (pos?.color ?? "b") === "w" ? "black" : "white";
   const theirColor = myColor === "white" ? "black" : "white";
+  // While replaying, the clock of the side to move runs down live toward the time it really had after its move.
+  const upcoming = plies[current];
+  const liveDrop = playing && upcoming?.spentMs ? Math.min(upcoming.spentMs, (waited / waitFor(upcoming.spentMs)) * upcoming.spentMs) : 0;
   const strip = (side: "white" | "black", mine: boolean) => (
     <ClockStrip
       name={mine ? (data.players?.me ?? "You") : (data.players?.opponent ?? "Opponent")}
-      clockMs={clocks.any ? clocks[side] : null}
+      clockMs={clocks.any && clocks[side] !== null ? Math.max(0, clocks[side]! - (toMove === side ? liveDrop : 0)) : null}
       active={current < plies.length && toMove === side}
       spentMs={pos && (pos.color === "w") === (side === "white") ? pos.spentMs : null}
     />
@@ -283,6 +323,16 @@ export function GameReview({ data }: { data: ReviewData }) {
           <button type="button" className="btn btn-secondary btn-icon" aria-label="Previous move" onClick={() => go(current - 1)}>
             <NavIcon d="M15 5l-8 7 8 7z" />
           </button>
+          <button
+            type="button"
+            className={`btn btn-icon ${playing ? "btn-primary" : "btn-secondary"}`}
+            aria-label={playing ? "Pause" : "Play the game"}
+            aria-pressed={playing}
+            onClick={togglePlay}
+            disabled={plies.length === 0}
+          >
+            {playing ? <NavIcon d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <NavIcon d="M8 5l11 7-11 7z" />}
+          </button>
           <button type="button" className="btn btn-secondary btn-icon" aria-label="Next move" onClick={() => go(current + 1)}>
             <NavIcon d="M9 5l8 7-8 7z" />
           </button>
@@ -292,6 +342,16 @@ export function GameReview({ data }: { data: ReviewData }) {
           <button type="button" className="btn btn-primary" onClick={nextMistake} disabled={flagged.length === 0}>
             Next mistake
           </button>
+          <label className="sr-only" htmlFor="play-speed">
+            Playback speed
+          </label>
+          <select id="play-speed" className="select min-h-[44px] rounded-full border-transparent bg-chip text-[0.875rem] font-semibold" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+            <option value={1}>Real time</option>
+            <option value={2}>2× speed</option>
+            <option value={5}>5× speed</option>
+            <option value={10}>10× speed</option>
+            <option value={0}>1 move a second</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
