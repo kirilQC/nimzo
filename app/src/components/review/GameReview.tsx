@@ -131,9 +131,8 @@ export function GameReview({ data }: { data: ReviewData }) {
     [plies.length],
   );
 
-  // Playback: the game replays move by move, waiting as long as each move really took (or faster).
+  // Playback: the game replays move by move, waiting as long as each move really took.
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState<number>(1); // 1, 2, 5, 10 = times faster than real; 0 = one move a second
   const [waited, setWaited] = useState(0); // ms since the current move appeared, while playing
   /** Any navigation by you stops the replay. */
   const go = useCallback(
@@ -143,7 +142,7 @@ export function GameReview({ data }: { data: ReviewData }) {
     },
     [jump],
   );
-  const waitFor = useCallback((ms: number | null) => (speed === 0 ? 1000 : Math.max(250, (ms ?? 1000) / speed)), [speed]);
+  const waitFor = useCallback((ms: number | null) => Math.max(250, ms ?? 1000), []);
   useEffect(() => {
     const upcoming = plies[current];
     if (!playing || !upcoming) return;
@@ -342,16 +341,6 @@ export function GameReview({ data }: { data: ReviewData }) {
           <button type="button" className="btn btn-primary" onClick={nextMistake} disabled={flagged.length === 0}>
             Next mistake
           </button>
-          <label className="sr-only" htmlFor="play-speed">
-            Playback speed
-          </label>
-          <select id="play-speed" className="select min-h-[44px] rounded-full border-transparent bg-chip text-[0.875rem] font-semibold" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-            <option value={1}>Real time</option>
-            <option value={2}>2× speed</option>
-            <option value={5}>5× speed</option>
-            <option value={10}>10× speed</option>
-            <option value={0}>1 move a second</option>
-          </select>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">

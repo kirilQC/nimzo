@@ -231,21 +231,12 @@ export function SessionCard({
     }
   }
 
-  async function analyzeLast() {
-    setBusy("analyzing");
-    const res = await sync(session?.id ?? null);
-    setBusy(null);
-    if (res?.latestGameId) router.push(`/games/${res.latestGameId}`);
-    else if (res) setMessage("No finished games found on chess.com yet.");
-  }
-
-  const endTarget = session ?? leftOpen;
   const kicker = on ? "Session mode is on" : busy === "backfill" ? "Importing your games" : "Session mode is off";
   const statusLine = on
     ? `Checking chess.com every 60 seconds for finished games${session ? ` · since ${new Date(session.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`
     : busy === "backfill"
       ? `Importing your last ${backfillMonths} months from chess.com…`
-      : "Turn it on before you play. Every finished game gets analyzed the moment it ends.";
+      : null;
 
   return (
     <section className="flex flex-col items-center px-4 pb-4 pt-10 text-center" aria-labelledby={labelId}>
@@ -261,11 +252,13 @@ export function SessionCard({
           </>
         )}
       </h1>
-      <p className="mt-4 max-w-[560px] text-[0.9375rem] text-body2" role="status">
-        {on && <span className="pulse-dot mr-2 inline-block h-2 w-2 rounded-full bg-good align-middle" aria-hidden="true" />}
-        {statusLine}
-        {on && syncing && <span className="text-muted"> · syncing…</span>}
-      </p>
+      {statusLine && (
+        <p className="mt-4 max-w-[560px] text-[0.9375rem] text-body2" role="status">
+          {on && <span className="pulse-dot mr-2 inline-block h-2 w-2 rounded-full bg-good align-middle" aria-hidden="true" />}
+          {statusLine}
+          {on && syncing && <span className="text-muted"> · syncing…</span>}
+        </p>
+      )}
 
       <button
         type="button"
@@ -273,7 +266,7 @@ export function SessionCard({
         aria-checked={on}
         aria-label="Session mode"
         disabled={busy === "starting" || busy === "ending" || busy === "backfill"}
-        onClick={() => (session ? end(session.id, "manual", false) : turnOn())}
+        onClick={() => (session ? end(session.id, "manual", games.length > 0) : turnOn())}
         className={`mt-8 min-h-[76px] rounded-full px-14 text-[1.375rem] font-extrabold transition-colors disabled:cursor-progress disabled:opacity-60 ${
           on
             ? "breathe border border-gold bg-transparent text-gold shadow-[0_0_0_10px_rgba(227,195,90,0.08)] hover:bg-[rgba(227,195,90,0.08)]"
@@ -283,26 +276,17 @@ export function SessionCard({
         {busy === "starting" ? "Starting…" : busy === "ending" ? "Stopping…" : on ? "Turn session off" : "Start a session"}
       </button>
 
-      <p className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[0.9375rem]">
-        <button type="button" className="font-bold text-gold underline underline-offset-4 disabled:opacity-50" onClick={analyzeLast} disabled={busy !== null}>
-          {busy === "analyzing" ? "Syncing…" : "Analyze my last game"}
-        </button>
-        <button
-          type="button"
-          className="text-muted underline-offset-4 enabled:text-body2 enabled:hover:underline disabled:cursor-not-allowed"
-          disabled={!endTarget || busy !== null}
-          onClick={() => endTarget && end(endTarget.id, endTarget === leftOpen ? "tab_closed" : "manual", true)}
-        >
-          End session &amp; summarize
-        </button>
-      </p>
 
       {engine === "waking" && <p className="mt-3 text-sm text-muted">Loading the engines…</p>}
       {engine === "error" && <p className="mt-3 text-sm text-muted">Maia didn&apos;t load. It will retry when a game needs it.</p>}
       {leftOpen && !on && (
         <p className="mt-3 max-w-[560px] text-sm text-body2">
           A session from {new Date(leftOpen.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} was left open.
-          End it to see its summary, or start a new one.
+{" "}
+          <button type="button" className="font-bold text-gold underline underline-offset-4" disabled={busy !== null} onClick={() => end(leftOpen.id, "tab_closed", true)}>
+            End it and see the summary
+          </button>
+          , or start a new one.
         </p>
       )}
       {message && <p className="mt-3 text-sm text-body2">{message}</p>}

@@ -49,12 +49,6 @@ export default async function HomePage() {
               ? `“${settings.coach_note}”`
               : "“Play a few games with Session mode on, and I'll tell you the habit that's costing you the most.”"}
           </blockquote>
-          <figcaption className="mt-3 text-sm text-muted">
-            Arthur{settings.coach_note ? ` · from your last ${WINDOW} games` : ""} ·{" "}
-            <Link href="/learn" className="font-bold text-gold underline underline-offset-4">
-              Drill this in Learn
-            </Link>
-          </figcaption>
         </figure>
       </div>
 
@@ -67,7 +61,6 @@ export default async function HomePage() {
         ) : (
           <p className="text-sm text-muted">Patterns appear once a few games have been analyzed and tagged.</p>
         )}
-        <p className="mt-4 text-xs text-muted">Tags by Jev · last {WINDOW} games</p>
       </section>
 
       <section aria-labelledby="history-h">
