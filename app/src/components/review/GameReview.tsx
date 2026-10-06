@@ -122,9 +122,10 @@ export function GameReview({ data }: { data: ReviewData }) {
       const list = listRef.current;
       const row = list?.querySelector<HTMLElement>(`[data-ply="${next}"]`)?.closest("li");
       if (list && row) {
-        const top = row.offsetTop - list.offsetTop;
-        if (top < list.scrollTop) list.scrollTop = top;
-        else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + row.offsetHeight - list.clientHeight;
+        // Measured on screen, so it works however the list is positioned; only scrolls when the row is out of view.
+        const lr = list.getBoundingClientRect(), rr = row.getBoundingClientRect();
+        if (rr.top < lr.top) list.scrollTop += rr.top - lr.top;
+        else if (rr.bottom > lr.bottom) list.scrollTop += rr.bottom - lr.bottom;
       }
     },
     [plies.length],
@@ -347,14 +348,13 @@ export function GameReview({ data }: { data: ReviewData }) {
 
         <CoachCard ply={pos} info={selectedCoach} data={data} />
 
+        <section className="card min-w-0" aria-labelledby="eval-h">
+          <h2 id="eval-h" className="mb-3 text-[1.0625rem]">
+            How the game went
+          </h2>
+          <EvalGraph points={graphPoints} segments={segments} current={current} onSelect={go} />
+        </section>
       </div>
-
-      <section className="card min-w-0 lg:col-span-2" aria-labelledby="eval-h">
-        <h2 id="eval-h" className="mb-3 text-[1.0625rem]">
-          How the game went
-        </h2>
-        <EvalGraph points={graphPoints} segments={segments} current={current} onSelect={go} />
-      </section>
     </div>
   );
 }

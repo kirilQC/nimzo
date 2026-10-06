@@ -61,11 +61,10 @@ export function EvalGraph({
   return (
     <div>
       {segments.length > 1 && (
-        <ol className="mb-3 flex" aria-label="The game in parts">
+        <ol className="mb-3 grid gap-y-3" style={{ gridTemplateColumns: `repeat(${segments.length}, minmax(0, 1fr))` }} aria-label="The game in parts">
           {segments.map((s) => {
-            const width = ((edge(s.toPly + 1) || W) - edge(s.fromPly)) / W;
             return (
-              <li key={s.phase} className="min-w-0 border-l border-line px-3 first:border-l-0 first:pl-0" style={{ flexBasis: `${width * 100}%`, flexGrow: 0, flexShrink: 1 }}>
+              <li key={s.phase} className="min-w-0 border-l border-line px-3 first:border-l-0 first:pl-0">
                 <p className="label-data text-gold">{s.title}</p>
                 <p className="text-[0.8125rem] text-muted">
                   Moves {s.fromMove} to {s.toMove}
