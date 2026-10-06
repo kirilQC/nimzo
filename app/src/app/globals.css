@@ -362,6 +362,8 @@ a { color: inherit; }
 
 @keyframes grow { from { width: 0; } }
 .bar-grow { animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes grow-y { from { transform: scaleY(0); } }
+.grow-y { animation: grow-y 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: bottom; }
 @keyframes reveal-x { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 .draw-in { animation: reveal-x 1100ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 @keyframes ring-in { from { stroke-dasharray: 0 999; } }
@@ -387,7 +389,7 @@ a { color: inherit; }
 .glide { transition: transform 260ms cubic-bezier(0.6, 0, 0.2, 1), width 260ms ease, height 260ms ease, opacity 160ms ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ghost, .page-enter, .page-enter > * > *, .bar-grow, .draw-in, .ring-in, .breathe, .pulse-dot, .shimmer, .word-in, .badge-pop { animation: none !important; }
+  .ghost, .page-enter, .page-enter > * > *, .bar-grow, .grow-y, .draw-in, .ring-in, .breathe, .pulse-dot, .shimmer, .word-in, .badge-pop { animation: none !important; }
   .lift, .row-lift, .glide { transition: none !important; }
   .lift:hover { transform: none; }
 }

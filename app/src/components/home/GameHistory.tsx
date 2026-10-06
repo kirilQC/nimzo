@@ -85,22 +85,38 @@ function PlayerLine({ side, color }: { side: Side; color: "white" | "black" }) {
   );
 }
 
-/** Your last games laid out the way chess.com's Game History shows them: White on top, Black below. */
-export function GameHistory({
-  games,
-  me,
-  looks,
-  oppAccuracy,
-}: {
-  games: GameRow[];
-  me: string;
-  looks: Map<string, PlayerLook>;
-  oppAccuracy: Map<string, number | null>;
-}) {
+/** One game as the history table shows it, from either the home page's rows or My games' rows. */
+export type HistoryRow = {
+  id: string;
+  end: string;
+  timeClass: string | null;
+  timeControl: string | null;
+  color: "white" | "black";
+  result: GameRow["result"];
+  opponent: string;
+  oppRating: number | null;
+  myRating: number | null;
+  oppLook?: PlayerLook | null;
+  myAcc: number | null;
+  oppAcc: number | null;
+  moves: number | null;
+  opening?: string | null;
+  ending?: string | null;
+};
+
+const TINT = { win: "bg-[rgba(143,211,168,0.07)] shadow-[inset_3px_0_0_var(--win)]", loss: "bg-[rgba(255,122,98,0.07)] shadow-[inset_3px_0_0_var(--loss)]", draw: "" } as const;
+
+/**
+ * Games laid out the way chess.com's Game History shows them: White over Black
+ * with avatars and flags, scores with a result square, both accuracies, moves
+ * and date. `details` adds the opening and how it ended; `tint` colours each
+ * row by result. The whole row opens the review.
+ */
+export function HistoryTable({ rows, me, myLook, details = false, tint = false, caption }: { rows: HistoryRow[]; me: string; myLook?: PlayerLook; details?: boolean; tint?: boolean; caption: string }) {
   return (
     <div className="table-scroll rounded-[14px] border border-line bg-card">
       <table className="w-full border-collapse text-[0.9375rem]">
-        <caption className="sr-only">Your last {games.length} games, newest first</caption>
+        <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="text-[0.8125rem] text-muted">
             <th scope="col" className="w-[84px] py-3 font-semibold">
@@ -109,6 +125,11 @@ export function GameHistory({
             <th scope="col" className="py-3 text-left font-semibold">
               Players
             </th>
+            {details && (
+              <th scope="col" className="py-3 text-left font-semibold">
+                Opening and ending
+              </th>
+            )}
             <th scope="col" className="w-[96px] py-3 font-semibold">
               Result
             </th>
@@ -124,32 +145,20 @@ export function GameHistory({
           </tr>
         </thead>
         <tbody>
-          {games.map((g) => {
-            const mine: Side = {
-              name: me,
-              rating: g.my_rating,
-              look: looks.get(me.toLowerCase()),
-              accuracy: g.accuracy_ours === null ? null : Number(g.accuracy_ours),
-              score: g.result === "win" ? "1" : g.result === "loss" ? "0" : "½",
-            };
-            const theirs: Side = {
-              name: g.opponent,
-              rating: g.opponent_rating,
-              look: looks.get(g.opponent.toLowerCase()),
-              accuracy: oppAccuracy.get(g.id) ?? null,
-              score: g.result === "win" ? "0" : g.result === "loss" ? "1" : "½",
-            };
-            const [white, black] = g.my_color === "white" ? [mine, theirs] : [theirs, mine];
-            const date = new Date(g.end_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          {rows.map((g) => {
+            const mine: Side = { name: me, rating: g.myRating, look: myLook, accuracy: g.myAcc, score: g.result === "win" ? "1" : g.result === "loss" ? "0" : "½" };
+            const theirs: Side = { name: g.opponent, rating: g.oppRating, look: g.oppLook ?? undefined, accuracy: g.oppAcc, score: g.result === "win" ? "0" : g.result === "loss" ? "1" : "½" };
+            const [white, black] = g.color === "white" ? [mine, theirs] : [theirs, mine];
+            const date = new Date(g.end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
             return (
-              <tr key={g.id} className="row-lift relative border-t border-line">
+              <tr key={g.id} className={`row-lift relative border-t border-line ${tint ? TINT[g.result] : ""}`}>
                 <td className="py-3 text-center">
                   <span className="flex flex-col items-center gap-0.5">
-                    <TimeIcon timeClass={g.time_class} />
-                    <span className="text-[0.75rem] text-muted">{tcLabel(g.time_control, g.time_class)}</span>
+                    <TimeIcon timeClass={g.timeClass} />
+                    <span className="text-[0.75rem] text-muted">{tcLabel(g.timeControl, g.timeClass)}</span>
                   </span>
                 </td>
-                <td className="max-w-0 py-3">
+                <td className={`py-3 ${details ? "w-[30%]" : "max-w-0"}`}>
                   {/* The whole row opens the review. */}
                   <Link href={`/games/${g.id}`} className="absolute inset-0 z-0" aria-label={`Review your ${g.result} against ${g.opponent}, ${date}`} />
                   <span className="flex flex-col gap-1.5">
@@ -157,6 +166,14 @@ export function GameHistory({
                     <PlayerLine side={black} color="black" />
                   </span>
                 </td>
+                {details && (
+                  <td className="max-w-0 py-3 pr-4">
+                    <span className="block truncate text-[0.875rem] text-gold" title={g.opening ?? undefined}>
+                      {g.opening ?? "Unknown opening"}
+                    </span>
+                    <span className="block truncate text-[0.875rem] text-body2">{g.ending}</span>
+                  </td>
+                )}
                 <td className="py-3">
                   <span className="flex items-center justify-center gap-3">
                     <span className="mono flex flex-col text-center text-[1rem] leading-[1.9rem] text-ink">
@@ -176,7 +193,7 @@ export function GameHistory({
                     <span className="inline-flex min-h-[38px] items-center rounded-[6px] bg-chip px-4 font-bold text-ink">Review</span>
                   )}
                 </td>
-                <td className="mono py-3 text-center text-[1rem] text-ink">{g.move_count ?? ""}</td>
+                <td className="mono py-3 text-center text-[1rem] text-ink">{g.moves ?? ""}</td>
                 <td className="py-3 pr-5 text-right text-body2">{date}</td>
               </tr>
             );
@@ -185,4 +202,24 @@ export function GameHistory({
       </table>
     </div>
   );
+}
+
+/** The home page's recent games. */
+export function GameHistory({ games, me, looks, oppAccuracy }: { games: GameRow[]; me: string; looks: Map<string, PlayerLook>; oppAccuracy: Map<string, number | null> }) {
+  const rows: HistoryRow[] = games.map((g) => ({
+    id: g.id,
+    end: g.end_time,
+    timeClass: g.time_class,
+    timeControl: g.time_control,
+    color: g.my_color,
+    result: g.result,
+    opponent: g.opponent,
+    oppRating: g.opponent_rating,
+    myRating: g.my_rating,
+    oppLook: looks.get(g.opponent.toLowerCase()),
+    myAcc: g.accuracy_ours === null ? null : Number(g.accuracy_ours),
+    oppAcc: oppAccuracy.get(g.id) ?? null,
+    moves: g.move_count,
+  }));
+  return <HistoryTable rows={rows} me={me} myLook={looks.get(me.toLowerCase())} caption={`Your last ${games.length} games, newest first`} />;
 }

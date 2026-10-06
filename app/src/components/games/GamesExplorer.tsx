@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { RatingJourney } from "./RatingJourney";
-import { PlayerBadge, type PlayerLook } from "@/components/PlayerBadge";
+import { AccuracyBands, EndingDonuts, GameLength, ModeCards, OpeningBars, PlayCalendar } from "./GameStats";
+import { HistoryTable, type HistoryRow } from "@/components/home/GameHistory";
+import { SectionHead } from "@/components/icons";
+import type { PlayerLook } from "@/components/PlayerBadge";
 
 export type ExplorerGame = {
   id: string;
@@ -22,31 +24,32 @@ export type ExplorerGame = {
   opening: string | null;
   eco: string | null;
   accuracy: number | null;
-  accuracyChesscom: number | null;
+  oppAccuracy: number | null;
   status: string;
-  blunders: number | null;
-  misses: number | null;
-  mistakes: number | null;
 };
 
-type SortKey = "end" | "opponent" | "oppRating" | "myRating" | "result" | "moves" | "accuracy" | "opening";
-const PAGE = 50;
-const CLASS_ORDER = ["bullet", "blitz", "rapid", "daily", "other"];
-const RESULT_TEXT = { win: "Win", loss: "Loss", draw: "Draw" } as const;
-const RESULT_RANK = { win: 2, draw: 1, loss: 0 } as const;
-
-const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+const PAGE = 25;
+const CLASS_ORDER = ["rapid", "blitz", "bullet", "daily", "other"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const localDay = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
-/** All games: filters, headline stats, rating journey, openings, and a sortable, searchable table. */
-export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
+/**
+ * My games: the rating section, win rate by time control, how games end, the
+ * calendar, accuracy and game length, top openings, then every game. Clicking a
+ * mode, a day or an opening filters the list at the bottom and scrolls to it.
+ */
+export function GamesExplorer({ games, me, myLook }: { games: ExplorerGame[]; me: string; myLook: PlayerLook | null }) {
   const [q, setQ] = useState("");
   const [timeClass, setTimeClass] = useState("all");
   const [result, setResult] = useState<"all" | "win" | "loss" | "draw">("all");
   const [color, setColor] = useState<"all" | "white" | "black">("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "end", dir: -1 });
+  const [day, setDay] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [today] = useState(() => Date.now());
+  const listRef = useRef<HTMLElement>(null);
 
   const classes = useMemo(() => {
     const seen = new Map<string, number>();
@@ -61,250 +64,112 @@ export function GamesExplorer({ games }: { games: ExplorerGame[] }) {
         (timeClass === "all" || g.timeClass === timeClass) &&
         (result === "all" || g.result === result) &&
         (color === "all" || g.color === color) &&
-        (!needle ||
-          g.opponent.toLowerCase().includes(needle) ||
-          (g.opening ?? "").toLowerCase().includes(needle) ||
-          (g.eco ?? "").toLowerCase().includes(needle) ||
-          g.ending.toLowerCase().includes(needle)),
+        (!day || localDay(g.end) === day) &&
+        (!needle || [g.opponent, g.opening, g.eco, g.ending].some((v) => v?.toLowerCase().includes(needle))),
     );
-  }, [games, q, timeClass, result, color]);
+  }, [games, q, timeClass, result, color, day]);
 
-  const sorted = useMemo(() => {
-    const val = (g: ExplorerGame): string | number | null => {
-      switch (sort.key) {
-        case "end":
-          return g.end;
-        case "result":
-          return RESULT_RANK[g.result];
-        case "opening":
-          return g.opening?.toLowerCase() ?? null;
-        case "opponent":
-          return g.opponent.toLowerCase();
-        default:
-          return g[sort.key];
-      }
-    };
-    return [...filtered].sort((a, b) => {
-      const x = val(a), y = val(b);
-      if (x === null && y === null) return 0;
-      if (x === null) return 1; // blanks last either way
-      if (y === null) return -1;
-      return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
-    });
-  }, [filtered, sort]);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const rows: HistoryRow[] = filtered.slice(page * PAGE, page * PAGE + PAGE).map((g) => ({
+    id: g.id,
+    end: g.end,
+    timeClass: g.timeClass,
+    timeControl: g.timeControl,
+    color: g.color,
+    result: g.result,
+    opponent: g.opponent,
+    oppRating: g.oppRating,
+    myRating: g.myRating,
+    oppLook: g.oppLook,
+    myAcc: g.accuracy,
+    oppAcc: g.oppAccuracy,
+    moves: g.moves,
+    opening: g.opening,
+    ending: g.ending,
+  }));
 
-  const pages = Math.max(1, Math.ceil(sorted.length / PAGE));
-  const shown = sorted.slice(page * PAGE, page * PAGE + PAGE);
-  const resetPage = <T,>(fn: (v: T) => void) => (v: T) => {
-    fn(v);
+  /** Apply a filter from the stats above and bring the list into view. */
+  const focus = (fn: () => void) => {
+    fn();
     setPage(0);
+    requestAnimationFrame(() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
-
-  const stats = useMemo(() => summarize(filtered), [filtered]);
-  function sortBy(key: SortKey) {
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "end" || key === "accuracy" || key === "myRating" || key === "oppRating" ? -1 : 1 }));
-    setPage(0);
-  }
+  const active = [
+    day && { label: new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), clear: () => setDay(null) },
+    q && { label: `“${q}”`, clear: () => setQ("") },
+    timeClass !== "all" && { label: cap(timeClass), clear: () => setTimeClass("all") },
+    result !== "all" && { label: cap(result === "loss" ? "losses" : result + "s"), clear: () => setResult("all") },
+    color !== "all" && { label: `As ${cap(color)}`, clear: () => setColor("all") },
+  ].filter(Boolean) as { label: string; clear: () => void }[];
 
   return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <div className="card flex flex-wrap items-end gap-3 p-4">
-        <label className="min-w-[220px] flex-1">
-          <span className="eyebrow mb-1 block">Search</span>
-          <input className="input" value={q} onChange={(e) => resetPage(setQ)(e.target.value)} placeholder="Opponent, opening, ECO, or how it ended" />
-        </label>
-        <Select label="Time control" value={timeClass} onChange={resetPage(setTimeClass)} options={[["all", `All (${games.length})`], ...classes.map((c) => [c.id, `${cap(c.id)} (${c.count})`] as [string, string])]} />
-        <Select label="Result" value={result} onChange={resetPage((v: string) => setResult(v as typeof result))} options={[["all", "All"], ["win", "Wins"], ["loss", "Losses"], ["draw", "Draws"]]} />
-        <Select label="Colour" value={color} onChange={resetPage((v: string) => setColor(v as typeof color))} options={[["all", "Both"], ["white", "White"], ["black", "Black"]]} />
-      </div>
-
-      {/* Headline stats */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Tile label="Games" value={stats.total.toLocaleString("en-US")} hint={`${stats.white} as White · ${stats.black} as Black`} />
-        <Tile
-          label="Win rate"
-          value={`${pct(stats.wins, stats.total)}%`}
-          hint={`${stats.wins} W · ${stats.losses} L · ${stats.draws} D (${pct(stats.losses, stats.total)}% lost, ${pct(stats.draws, stats.total)}% drawn)`}
-        />
-        <Tile
-          label={timeClass === "all" ? "Rating now" : `${cap(timeClass)} rating`}
-          value={stats.current ?? "–"}
-          hint={stats.peak ? `Peak ${stats.peak.rating} on ${fmtDate(stats.peak.end)}` : undefined}
-        />
-        <Tile label="Most played opening" value={<span className="text-lg">{stats.openings[0]?.name ?? "–"}</span>} hint={stats.openings[0] ? `${stats.openings[0].games} games · ${pct(stats.openings[0].wins, stats.openings[0].games)}% won` : undefined} />
-      </div>
-
-      {/* Rating: one time control at a time */}
+    <div className="space-y-5">
       <RatingJourney games={games} initial={timeClass === "all" ? undefined : timeClass} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Openings */}
-        <section className="card table-scroll p-0" aria-labelledby="openings-h">
-          <h2 id="openings-h" className="px-5 pt-5">
-            Openings
-          </h2>
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Opening</th>
-                <th scope="col" className="text-right">Games</th>
-                <th scope="col" className="text-right">Win %</th>
-                <th scope="col" className="text-right">W / L / D</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.openings.slice(0, 10).map((o) => (
-                <tr key={o.name} className="row-lift cursor-pointer" onClick={() => resetPage(setQ)(o.name)} title="Show these games">
-                  <td className="max-w-[240px] truncate text-walnut">{o.name}</td>
-                  <td className="mono text-right text-ink">{o.games}</td>
-                  <td className="mono text-right text-ink">{pct(o.wins, o.games)}</td>
-                  <td className="mono text-right text-body2">
-                    {o.wins} / {o.losses} / {o.draws}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+      <ModeCards games={games} active={timeClass} onPick={(m) => focus(() => setTimeClass(m))} />
+      <EndingDonuts games={games} />
+      <PlayCalendar games={games} selected={day} onPick={(d) => focus(() => setDay(d))} today={today} />
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+        <AccuracyBands games={games} />
+        <GameLength games={games} />
+      </div>
+      <OpeningBars games={games} onPick={(name) => focus(() => setQ(name))} />
 
-        {/* How games end */}
-        <section className="card" aria-labelledby="endings-h">
-          <h2 id="endings-h" className="mb-3">
-            How games end
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {(["win", "loss", "draw"] as const).map((r) => (
-              <div key={r}>
-                <p className="eyebrow mb-1">
-                  {RESULT_TEXT[r]}s · {r === "win" ? stats.wins : r === "loss" ? stats.losses : stats.draws}
-                </p>
-                <ul className="space-y-0.5 text-sm">
-                  {stats.endings[r].map(([how, n]) => (
-                    <li key={how} className="flex justify-between gap-2">
-                      <span className="text-body2">{how}</span>
-                      <span className="mono text-ink">{n}</span>
-                    </li>
-                  ))}
-                  {!stats.endings[r].length && <li className="text-muted">None</li>}
-                </ul>
-              </div>
+      <section ref={listRef} aria-labelledby="list-h" className="scroll-mt-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <SectionHead icon="swords" title="All games" sub={`${filtered.length.toLocaleString("en-US")} ${filtered.length === 1 ? "game" : "games"}${filtered.length !== games.length ? ` of ${games.length.toLocaleString("en-US")}` : ""} · newest first`} id="list-h" />
+        </div>
+        <div className="card mb-3 flex flex-wrap items-end gap-3 p-4">
+          <label className="min-w-[220px] flex-1">
+            <span className="label-data mb-1 block">Search</span>
+            <input
+              className="input"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(0);
+              }}
+              placeholder="Opponent, opening, ECO, or how it ended"
+            />
+          </label>
+          <Select label="Time control" value={timeClass} onChange={(v) => { setTimeClass(v); setPage(0); }} options={[["all", `All (${games.length})`], ...classes.map((c) => [c.id, `${cap(c.id)} (${c.count})`] as [string, string])]} />
+          <Select label="Result" value={result} onChange={(v) => { setResult(v as typeof result); setPage(0); }} options={[["all", "All"], ["win", "Wins"], ["loss", "Losses"], ["draw", "Draws"]]} />
+          <Select label="Colour" value={color} onChange={(v) => { setColor(v as typeof color); setPage(0); }} options={[["all", "Both"], ["white", "White"], ["black", "Black"]]} />
+        </div>
+        {active.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {active.map((a) => (
+              <button key={a.label} type="button" onClick={() => { a.clear(); setPage(0); }} className="inline-flex items-center gap-2 rounded-full border border-gold bg-[rgba(227,195,90,0.1)] px-3 py-1 text-[0.8125rem] font-semibold text-gold">
+                {a.label} <span aria-hidden="true">×</span>
+                <span className="sr-only">Remove this filter</span>
+              </button>
             ))}
           </div>
-        </section>
-      </div>
-
-      {/* Table */}
-      <section className="card table-scroll p-0" aria-labelledby="list-h">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5">
-          <h2 id="list-h">Games</h2>
-          <p className="text-sm text-muted">
-            {sorted.length.toLocaleString("en-US")} {sorted.length === 1 ? "game" : "games"}
-            {sorted.length !== games.length && " match"}
-          </p>
-        </div>
-        <table className="table text-sm">
-          <thead>
-            <tr>
-              <Th label="Date" k="end" sort={sort} onSort={sortBy} />
-              <Th label="Opponent" k="opponent" sort={sort} onSort={sortBy} />
-              <Th label="Theirs" k="oppRating" sort={sort} onSort={sortBy} right />
-              <Th label="Mine" k="myRating" sort={sort} onSort={sortBy} right />
-              <Th label="Result" k="result" sort={sort} onSort={sortBy} />
-              <th scope="col">How it ended</th>
-              <Th label="Moves" k="moves" sort={sort} onSort={sortBy} right />
-              <Th label="Opening" k="opening" sort={sort} onSort={sortBy} />
-              <Th label="Accuracy" k="accuracy" sort={sort} onSort={sortBy} right />
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((g) => (
-              <tr key={g.id} className="row-lift">
-                <td className="whitespace-nowrap text-body2" suppressHydrationWarning>
-                  <span className="mono">{fmtDate(g.end)}</span>
-                  <span className="block text-xs text-muted" title={g.timeControl ?? undefined}>
-                    {cap(g.timeClass)}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap font-semibold text-ink">
-                  <span className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full border border-line align-middle ${g.color === "white" ? "bg-white" : "bg-[#111]"}`} title={`You played ${g.color}`} aria-label={`You played ${g.color}`} />
-                  <Link href={`/games/${g.id}`} className="text-ink no-underline hover:underline" title={g.status === "imported" ? "Open and analyze this game" : "Review this game"}>
-                    <PlayerBadge name={g.opponent} look={g.oppLook ?? undefined} size={24} />
-                  </Link>
-                </td>
-                <td className="mono text-right text-body2">{g.oppRating ?? "–"}</td>
-                <td className="mono text-right text-ink">{g.myRating ?? "–"}</td>
-                <td className={g.result === "win" ? "font-semibold text-good" : g.result === "loss" ? "font-semibold text-[color:var(--blunder-bg)]" : "text-body2"}>{RESULT_TEXT[g.result]}</td>
-                <td className="text-body2">{g.ending}</td>
-                <td className="mono text-right text-body2">{g.moves ?? "–"}</td>
-                <td className="max-w-[150px] truncate text-walnut" title={[g.eco, g.opening].filter(Boolean).join(" ")}>
-                  {g.opening ?? "—"}
-                </td>
-                <td className="mono text-right text-ink" title={g.accuracyChesscom !== null ? `chess.com: ${g.accuracyChesscom.toFixed(1)}` : undefined}>
-                  {g.accuracy !== null ? g.accuracy.toFixed(1) : <span className="text-muted">–</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex items-center justify-between gap-2 px-5 py-3 text-sm">
-          <button type="button" className="btn btn-secondary" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
-            ← Newer
-          </button>
-          <span className="text-muted">
-            Page {page + 1} of {pages}
-          </span>
-          <button type="button" className="btn btn-secondary" onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1}>
-            Older →
-          </button>
-        </div>
+        )}
+        {rows.length ? (
+          <HistoryTable rows={rows} me={me} myLook={myLook ?? undefined} details tint caption="Your games, newest first" />
+        ) : (
+          <p className="card text-sm text-muted">No games match these filters.</p>
+        )}
+        {pages > 1 && (
+          <div className="mt-3 flex items-center justify-between text-[0.875rem] text-muted">
+            <span>
+              Showing {page * PAGE + 1} to {Math.min(filtered.length, (page + 1) * PAGE)} of {filtered.length.toLocaleString("en-US")}
+            </span>
+            <span className="flex items-center gap-2">
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                Newer
+              </button>
+              <span className="mono text-ink">
+                {page + 1} / {pages}
+              </span>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>
+                Older
+              </button>
+            </span>
+          </div>
+        )}
       </section>
-    </div>
-  );
-}
-
-function summarize(games: ExplorerGame[]) {
-  let wins = 0, losses = 0, draws = 0, white = 0, black = 0;
-  const openings = new Map<string, { name: string; games: number; wins: number; losses: number; draws: number }>();
-  const endings = { win: new Map<string, number>(), loss: new Map<string, number>(), draw: new Map<string, number>() };
-  let peak: { rating: number; end: string } | null = null;
-  let latest: ExplorerGame | null = null;
-  for (const g of games) {
-    if (g.result === "win") wins++;
-    else if (g.result === "loss") losses++;
-    else draws++;
-    if (g.color === "white") white++;
-    else black++;
-    const name = g.opening ?? "Unknown opening";
-    const o = openings.get(name) ?? { name, games: 0, wins: 0, losses: 0, draws: 0 };
-    o.games++;
-    o[g.result === "win" ? "wins" : g.result === "loss" ? "losses" : "draws"]++;
-    openings.set(name, o);
-    endings[g.result].set(g.ending, (endings[g.result].get(g.ending) ?? 0) + 1);
-    if (g.myRating !== null && (!peak || g.myRating > peak.rating)) peak = { rating: g.myRating, end: g.end };
-    if (g.myRating !== null && (!latest || g.end > latest.end)) latest = g;
-  }
-  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
-  return {
-    total: games.length,
-    wins,
-    losses,
-    draws,
-    white,
-    black,
-    current: latest?.myRating ?? null,
-    peak,
-    openings: [...openings.values()].filter((o) => o.name !== "Unknown opening").sort((a, b) => b.games - a.games),
-    endings: { win: top(endings.win), loss: top(endings.loss), draw: top(endings.draw) },
-  };
-}
-
-function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
-  return (
-    <div className="card p-4">
-      <p className="eyebrow">{label}</p>
-      <p className="mono mt-1 text-2xl text-ink">{value}</p>
-      {hint && <p className="mt-0.5 text-sm text-muted">{hint}</p>}
     </div>
   );
 }
@@ -312,28 +177,14 @@ function Tile({ label, value, hint }: { label: string; value: React.ReactNode; h
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <label>
-      <span className="eyebrow mb-1 block">{label}</span>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map(([v, t]) => (
+      <span className="label-data mb-1 block">{label}</span>
+      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map(([v, l]) => (
           <option key={v} value={v}>
-            {t}
+            {l}
           </option>
         ))}
       </select>
     </label>
-  );
-}
-
-function Th({ label, k, sort, onSort, right }: { label: string; k: SortKey; sort: { key: SortKey; dir: 1 | -1 }; onSort: (k: SortKey) => void; right?: boolean }) {
-  const active = sort.key === k;
-  return (
-    <th scope="col" aria-sort={active ? (sort.dir === 1 ? "ascending" : "descending") : "none"} className={right ? "text-right" : undefined}>
-      <button type="button" onClick={() => onSort(k)} className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${active ? "text-ink" : ""}`}>
-        {label}
-        <span aria-hidden="true" className="text-xs">
-          {active ? (sort.dir === 1 ? "▲" : "▼") : "↕"}
-        </span>
-      </button>
-    </th>
   );
 }

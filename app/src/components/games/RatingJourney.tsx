@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { CountUp } from "@/components/motion";
 
-export type RatedGame = { timeClass: string | null; end: string; myRating: number | null; result: "win" | "loss" | "draw" };
+export type RatedGame = { timeClass: string | null; end: string; myRating: number | null; result: "win" | "loss" | "draw"; accuracy?: number | null };
 
 const MODES = [
   ["rapid", "Rapid"],
@@ -41,6 +41,10 @@ export function RatingJourney({ games, initial }: { games: RatedGame[]; initial?
     const last30 = list.slice(-30);
     const before30g = list.length > 30 ? list[list.length - 31]!.rating : list[0]!.rating;
     const wins = list.filter((p) => p.result === "win").length, losses = list.filter((p) => p.result === "loss").length;
+    // Accuracy: the median is your typical game; the average is shown beside it.
+    const accs = games.filter((g) => g.timeClass === mode && g.accuracy !== null && g.accuracy !== undefined).map((g) => g.accuracy!).sort((a, b) => a - b);
+    const median = accs.length ? (accs.length % 2 ? accs[(accs.length - 1) / 2]! : (accs[accs.length / 2 - 1]! + accs[accs.length / 2]!) / 2) : null;
+    const mean = accs.length ? accs.reduce((a, b) => a + b, 0) / accs.length : null;
     const t0 = list[0]!.t, t1 = now.t;
     const lo = Math.min(...list.map((p) => p.rating)) - 20, hi = Math.max(...list.map((p) => p.rating)) + 20;
     const x = (t: number) => ((t - t0) / Math.max(1, t1 - t0)) * W;
@@ -52,6 +56,7 @@ export function RatingJourney({ games, initial }: { games: RatedGame[]; initial?
       d30: { change: now.rating - before30d, from: before30d },
       g30: { change: now.rating - before30g, wins: last30.filter((p) => p.result === "win").length, losses: last30.filter((p) => p.result === "loss").length },
       record: { wins, losses, games: list.length, pct: Math.round((wins / list.length) * 100) },
+      accuracy: { median, mean, n: accs.length },
       start: t0,
       x,
       y,
@@ -78,7 +83,7 @@ export function RatingJourney({ games, initial }: { games: RatedGame[]; initial?
       <h2 id="rating-h" className="sr-only">
         Rating
       </h2>
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-5">
         <Metric label="Peak" sub={monthYear(data.peak.t)}>
           <CountUp to={data.peak.rating} />
         </Metric>
@@ -93,6 +98,9 @@ export function RatingJourney({ games, initial }: { games: RatedGame[]; initial?
           <span className="text-[0.55em] text-muted"> W </span>
           {data.record.losses}
           <span className="text-[0.55em] text-muted"> L</span>
+        </Metric>
+        <Metric label="Accuracy" sub={data.accuracy.mean !== null ? `typical game · average ${data.accuracy.mean.toFixed(1)}` : "no analyzed games yet"}>
+          {data.accuracy.median !== null ? <CountUp to={data.accuracy.median} decimals={1} /> : "?"}
         </Metric>
       </div>
 
